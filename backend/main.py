@@ -1,9 +1,11 @@
 from flask import Flask, request, jsonify
 from flask_restful import Api
 from flask_jwt_extended import JWTManager
-from applications.api import LoginAPI, SignupAPI, ParkingLotsAPI, UserProfileAPI
+from applications.api import HomeAPI, UserProfileAPI
+from applications.parkinglot_api import ParkingLotsAPI
+from applications.auth_api import LoginAPI, SignupAPI
+from applications.parkingspot_api import ParkingSpotsAPI
 from applications.models import db, Users, ParkingLot, ParkingSpot, Reservation, create_default_admin
-from werkzeug.security import generate_password_hash
 from datetime import timedelta
 import os
 
@@ -38,6 +40,8 @@ api.add_resource(LoginAPI, '/api/login')
 api.add_resource(SignupAPI, '/api/signup')
 api.add_resource(ParkingLotsAPI, '/api/parking_lots', '/api/parking_lots/<int:lot_id>')
 api.add_resource(UserProfileAPI, '/api/user/profile')
+api.add_resource(HomeAPI, '/api/home')
+api.add_resource(ParkingSpotsAPI, '/api/parking_lots/<int:lot_id>/spots', '/api/parking_lots/<int:lot_id>/spots/<int:spot_id>')
 
 if __name__ == '__main__':
     app.run(debug=True, port = 5000)

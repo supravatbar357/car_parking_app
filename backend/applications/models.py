@@ -18,6 +18,14 @@ class Users(db.Model):
     def __repr__(self):
         return f"<User {self.name} - Admin: {self.is_admin}>"
 
+    def convert_to_json(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "email": self.email,
+            "is_admin": self.is_admin
+        }
+
 
 class ParkingLot(db.Model):
     __tablename__ = "parking_lots"
@@ -33,6 +41,16 @@ class ParkingLot(db.Model):
 
     def __repr__(self):
         return f"<ParkingLot {self.prime_location_name} ({self.number_of_spots} spots)>"
+    
+    def convert_to_json(self):
+        return {
+            "id": self.id,
+            "prime_location_name": self.prime_location_name,
+            "price": self.price,
+            "address": self.address,
+            "pin_code": self.pin_code,
+            "number_of_spots": self.number_of_spots
+        }
 
 
 class ParkingSpot(db.Model):
@@ -46,6 +64,13 @@ class ParkingSpot(db.Model):
 
     def __repr__(self):
         return f"<ParkingSpot {self.id} - Lot {self.lot_id} - Status {self.status}>"
+    
+    def convert_to_json(self):
+        return {
+            "id": self.id,
+            "lot_id": self.lot_id,
+            "status": self.status
+        }
 
 
 class Reservation(db.Model):
@@ -60,6 +85,16 @@ class Reservation(db.Model):
 
     def __repr__(self):
         return f"<Reservation User {self.user_id} - Spot {self.spot_id}>"
+    
+    def convert_to_json(self):
+        return {
+            "id": self.id,
+            "spot_id": self.spot_id,
+            "user_id": self.user_id,
+            "parking_timestamp": self.parking_timestamp.isoformat(),
+            "leaving_timestamp": self.leaving_timestamp.isoformat() if self.leaving_timestamp else None,
+            "parking_cost": self.parking_cost
+        }
 
 
 def create_default_admin():
