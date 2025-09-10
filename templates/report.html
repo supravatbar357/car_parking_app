@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Monthly Parking Report</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f9f9f9;
+            padding: 20px;
+        }
+        h2 {
+            color: #333;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 15px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+            text-align: left;
+            padding: 8px;
+        }
+        th {
+            background: #4CAF50;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background: #f2f2f2;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h2>Hello {{ username }},</h2>
+    <p>Here is your monthly parking activity report:</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Reservation ID</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th>Spot ID</th>
+                <th>Parking Lot</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for res in reservations %}
+            <tr>
+                <td>{{ res[0] }}</td>
+                <td>{{ res[1] }}</td>
+                <td>{{ res[2] }}</td>
+                <td>{{ res[3] }}</td>
+                <td>{{ res[4] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <p>Thank you for using ParkingApp </p>
+        <p>This report was generated automatically on {{ "%Y-%m-%d" | format(datetime.utcnow()) }}</p>
+    </div>
+</body>
+</html>

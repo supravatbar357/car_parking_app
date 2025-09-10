@@ -42,8 +42,8 @@ class ParkingLot(db.Model):
     def __repr__(self):
         return f"<ParkingLot {self.prime_location_name} ({self.number_of_spots} spots)>"
     
-    def convert_to_json(self):
-        return {
+    def convert_to_json(self, include_spots=False):
+        data = {
             "id": self.id,
             "prime_location_name": self.prime_location_name,
             "price": self.price,
@@ -51,7 +51,9 @@ class ParkingLot(db.Model):
             "pin_code": self.pin_code,
             "number_of_spots": self.number_of_spots
         }
-
+        if include_spots:
+            data["spots"] = [spot.convert_to_json() for spot in self.spots]
+        return data
 
 class ParkingSpot(db.Model):
     __tablename__ = "parking_spots"

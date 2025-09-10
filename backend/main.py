@@ -1,47 +1,27 @@
-from flask import Flask, request, jsonify
-from flask_restful import Api
+from flask import Flask
 from flask_jwt_extended import JWTManager
-from applications.api import HomeAPI, UserProfileAPI
-from applications.parkinglot_api import ParkingLotsAPI
-from applications.auth_api import LoginAPI, SignupAPI
-from applications.parkingspot_api import ParkingSpotsAPI
-from applications.models import db, Users, ParkingLot, ParkingSpot, Reservation, create_default_admin
-from datetime import timedelta
-import os
+from flask_restful import Api
+from applications.models import db, create_default_admin
+from applications.config import Config
+from applications.worker import make_celery
+from applications.routes import register_routes
+from applications.api import cache
 
 app = Flask(__name__)
+app.config.from_object(Config)
 
-# Base directory for SQLite
-base_dir = os.path.abspath(os.path.dirname(__file__))
-
-# Initialize Flask app
-app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(base_dir, "database.sqlite3")
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SECRET_KEY"]="super-secret"
-app.config["JWT_SECRET_KEY"] = "jwt-super-secret"
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
-
-
-
-# Initialize DB + API
 db.init_app(app)
+cache.init_app(app)
 jwt = JWTManager(app)
 api = Api(app)
 
-# Ensure tables are created
+celery = make_celery(app)
+
 with app.app_context():
     db.create_all()
     create_default_admin()
 
-
-# Add API resources
-api.add_resource(LoginAPI, '/api/login')
-api.add_resource(SignupAPI, '/api/signup')
-api.add_resource(ParkingLotsAPI, '/api/parking_lots', '/api/parking_lots/<int:lot_id>')
-api.add_resource(UserProfileAPI, '/api/user/profile')
-api.add_resource(HomeAPI, '/api/home')
-api.add_resource(ParkingSpotsAPI, '/api/parking_lots/<int:lot_id>/spots', '/api/parking_lots/<int:lot_id>/spots/<int:spot_id>')
+register_routes(api)
 
 if __name__ == '__main__':
-    app.run(debug=True, port = 5000)
+    app.run(debug=True, port=5000)
