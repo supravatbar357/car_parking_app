@@ -1,23 +1,46 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
+
+import HomeView from '@/components/HomeView.vue'
+import LoginView from '@/components/LoginView.vue'
+import RegisterView from '@/components/RegisterView.vue'
+import AdminDashboard from '@/components/AdminDashboard.vue'
+import UserDashboard from '@/components/UserDashboard.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    {
-      path: '/',
-      name: 'home',
-      component: HomeView,
+    { path: '/', name: 'home', component: HomeView },
+    { path: '/login', name: 'login', component: LoginView },
+    { path: '/register', name: 'register', component: RegisterView },
+    { 
+      path: '/AdminDashboard', 
+      name: 'AdminDashboard', 
+      component: AdminDashboard, 
+      meta: { requiresAuth: true, adminOnly: true }
     },
-    {
-      path: '/about',
-      name: 'about',
-      // route level code-splitting
-      // this generates a separate chunk (About.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
-      component: () => import('../views/AboutView.vue'),
+    { 
+      path: '/UserDashboard', 
+      name: 'UserDashboard', 
+      component: UserDashboard,
+      meta: { requiresAuth: true }
     },
   ],
+})
+
+// Navigation guards
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('token')
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+
+  if (to.meta.requiresAuth && !token) {
+    return next('/login') // force login
+  }
+
+  if (to.meta.adminOnly && !user.is_admin) {
+    return next('/UserDashboard') // non-admins go to user dashboard
+  }
+
+  next()
 })
 
 export default router
