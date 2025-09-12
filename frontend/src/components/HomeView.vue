@@ -9,16 +9,10 @@
           Please login or register to continue.
         </p>
         <div class="d-flex justify-content-center gap-3 mt-4">
-          <router-link
-            to="/login"
-            class="btn btn-primary btn-lg px-4"
-          >
+          <router-link to="/login" class="btn btn-primary btn-lg px-4">
             Login
           </router-link>
-          <router-link
-            to="/register"
-            class="btn btn-outline-secondary btn-lg px-4"
-          >
+          <router-link to="/register" class="btn btn-outline-secondary btn-lg px-4">
             Register
           </router-link>
         </div>

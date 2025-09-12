@@ -69,12 +69,19 @@ export default {
         this.alertMessage = data.message || "Login successful";
         this.alertType = "success";
 
-        // Save token + role in localStorage
+        // Save token + user info
         if (data.token) {
           localStorage.setItem("token", data.token);
         }
         if (data.user) {
           localStorage.setItem("user", JSON.stringify(data.user));
+
+          // ✅ Fix: Update App.vue state immediately
+          this.$root.isLoggedIn = true;
+          this.$root.userName = data.user.name || "User";
+
+          // Still emit event for consistency
+          this.$root.$emit("user-logged-in", data.user);
         }
 
         // Redirect based on role
