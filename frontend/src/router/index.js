@@ -5,6 +5,7 @@ import LoginView from '@/components/LoginView.vue'
 import RegisterView from '@/components/RegisterView.vue'
 import AdminDashboard from '@/components/AdminDashboard.vue'
 import UserDashboard from '@/components/UserDashboard.vue'
+import AddParkinglots from '@/components/AddParkinglots.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -12,14 +13,24 @@ const router = createRouter({
     { path: '/', name: 'home', component: HomeView },
     { path: '/login', name: 'login', component: LoginView },
     { path: '/register', name: 'register', component: RegisterView },
+
+    // Admin Dashboard
     { 
-      path: '/AdminDashboard', 
+      path: '/admindashboard',
       name: 'AdminDashboard', 
       component: AdminDashboard, 
       meta: { requiresAuth: true, adminOnly: true }
     },
     { 
-      path: '/UserDashboard', 
+      path: '/admindashboard/add-parking-lot',
+      name: 'AddParkinglots', 
+      component: AddParkinglots,
+      meta: { requiresAuth: true, adminOnly: true }
+    },
+
+    // User Dashboard
+    { 
+      path: '/user',
       name: 'UserDashboard', 
       component: UserDashboard,
       meta: { requiresAuth: true }
@@ -33,11 +44,11 @@ router.beforeEach((to, from, next) => {
   const user = JSON.parse(localStorage.getItem('user') || '{}')
 
   if (to.meta.requiresAuth && !token) {
-    return next('/login') // force login
+    return next('/login')
   }
 
   if (to.meta.adminOnly && !user.is_admin) {
-    return next('/UserDashboard') // non-admins go to user dashboard
+    return next('/user')
   }
 
   next()

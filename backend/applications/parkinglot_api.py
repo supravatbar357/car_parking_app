@@ -8,7 +8,7 @@ from .task import export_parking_data
 
 class ParkingLotsAPI(Resource):
     @jwt_required()
-    @cache.cached(timeout=300)
+    @cache.cached(timeout=60)
     def get(self):
         lots = ParkingLot.query.all()
         return {"parking_lots": [lot.convert_to_json(include_spots=True) for lot in lots]}, 200
