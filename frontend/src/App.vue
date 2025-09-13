@@ -3,7 +3,7 @@
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
       <div class="container-fluid">
-        <a class="navbar-brand fw-bold" href="#">🚗 Parking App</a>
+        <a class="navbar-brand fw-bold" href="#">Parking App</a>
         <button
           class="navbar-toggler"
           type="button"
@@ -15,13 +15,11 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto align-items-center">
-            <!-- Always visible -->
-            <li class="nav-item">
-              <router-link to="/" class="nav-link">Home</router-link>
-            </li>
-
             <!-- If NOT logged in -->
             <template v-if="!isLoggedIn">
+              <li class="nav-item">
+                <router-link to="/" class="nav-link">Home</router-link>
+              </li>
               <li class="nav-item">
                 <router-link to="/login" class="btn btn-outline-light mx-2">
                   Login
@@ -72,7 +70,7 @@
 
     <!-- Footer -->
     <footer class="bg-dark text-white text-center py-3 mt-auto">
-      <p class="mb-0">© 2025 Vehicle Parking App | Designed with ❤️</p>
+      <p class="mb-0">© 2025 Vehicle Parking App || All right reserved</p>
     </footer>
   </div>
 </template>
@@ -95,7 +93,7 @@ export default {
       this.userName = parsed.name || "User";
     }
 
-    // Listen for login event (optional)
+    // Listen for login event
     this.$root.$on("user-logged-in", (user) => {
       this.isLoggedIn = true;
       this.userName = user.name || "User";
