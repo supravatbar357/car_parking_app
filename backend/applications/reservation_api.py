@@ -2,9 +2,35 @@ from flask import current_app as app, request
 from applications.models import db, Users, ParkingSpot, Reservation
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from flask_restful import Resource, abort
-from datetime import datetime
+from datetime import datetime, timezone
 from .api import cache
 from sqlalchemy.exc import SQLAlchemyError
+
+
+
+def parse_iso_datetime(s: str) -> datetime:
+    """
+    Parse an ISO 8601 datetime string and return a naive UTC datetime.
+
+    Accepts:
+      - '2025-09-18T20:30:00Z'
+      - '2025-09-18T20:30:00+05:30'
+      - '2025-09-18T20:30:00'
+    """
+    if not isinstance(s, str):
+        raise ValueError("Datetime must be a string")
+
+    # Handle trailing Z (Zulu/UTC)
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+
+    dt = datetime.fromisoformat(s)
+
+    # Convert aware datetimes to UTC, strip tzinfo
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+    return dt
 
 
 class ReservationAPI(Resource):
@@ -47,7 +73,7 @@ class ReservationAPI(Resource):
             start_time = data.get("start_time")
             if start_time:
                 try:
-                    parking_dt = datetime.fromisoformat(start_time)
+                    parking_dt = parse_iso_datetime(start_time)
                 except Exception:
                     return {"error": "Invalid datetime format. Use ISO 8601"}, 400
             else:
@@ -103,7 +129,7 @@ class ReservationAPI(Resource):
                     return {"error": "leaving_time is required"}, 400
 
                 try:
-                    leaving_dt = datetime.fromisoformat(leaving_time)
+                    leaving_dt = parse_iso_datetime(leaving_time)
                 except Exception:
                     return {"error": "Invalid datetime format. Use ISO 8601"}, 400
 

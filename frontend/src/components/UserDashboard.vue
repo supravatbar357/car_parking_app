@@ -24,7 +24,9 @@
       >
         <div class="card shadow-lg border-0 h-100 parking-card">
           <div class="card-body">
-            <h5 class="card-title text-primary fw-bold">{{ lot.prime_location_name }}</h5>
+            <h5 class="card-title text-primary fw-bold">
+              {{ lot.prime_location_name }}
+            </h5>
             <p class="mb-1"><strong>💰 Price:</strong> ₹{{ lot.price }} / hr</p>
             <p class="mb-1"><strong>📍 Address:</strong> {{ lot.address }}</p>
             <p class="mb-1"><strong>📮 Pin Code:</strong> {{ lot.pin_code }}</p>
@@ -54,6 +56,47 @@
     <div v-else class="text-center mt-5">
       <p class="text-muted">No parking lots available at the moment.</p>
     </div>
+
+    <!-- My Reservations -->
+    <div class="mt-5">
+      <h2 class="mb-4 text-center">📋 My Reservations</h2>
+
+      <div v-if="myReservations.length === 0" class="text-center text-muted">
+        No active reservations.
+      </div>
+
+      <div v-else class="row g-4">
+        <div
+          v-for="res in myReservations"
+          :key="res.id"
+          class="col-md-6 col-lg-4"
+        >
+          <div class="card shadow-lg border-0 h-100 reservation-card">
+            <div class="card-body">
+              <h5 class="card-title fw-bold text-success">
+                Reservation #{{ res.id }}
+              </h5>
+              <p><strong>🅿️ Spot:</strong> #{{ res.spot_id }}</p>
+              <p><strong>⏰ Start:</strong> {{ formatDate(res.parking_timestamp) }}</p>
+              <p v-if="res.leaving_timestamp">
+                <strong>🏁 Left:</strong> {{ formatDate(res.leaving_timestamp) }}
+              </p>
+              <p v-if="res.parking_cost">
+                <strong>💰 Cost:</strong> ₹{{ res.parking_cost }}
+              </p>
+
+              <button
+                class="btn btn-warning w-100 mt-2"
+                v-if="!res.leaving_timestamp"
+                @click="releaseReservation(res.id)"
+              >
+                Release Spot
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -63,6 +106,7 @@ export default {
   data() {
     return {
       parkingLots: [],
+      myReservations: [],
       loading: true,
       error: null,
     };
@@ -91,6 +135,53 @@ export default {
       }
     },
 
+    async fetchReservations() {
+      const token = localStorage.getItem("token");
+      try {
+        const res = await fetch("/api/reservations", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) throw new Error("Failed to fetch reservations");
+
+        const data = await res.json();
+        this.myReservations = data.reservations || [];
+      } catch (err) {
+        this.error = err.message;
+      }
+    },
+
+    async releaseReservation(reservationId) {
+      const token = localStorage.getItem("token");
+      try {
+        const res = await fetch(`/api/reservations/${reservationId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            action: "released",
+            leaving_time: new Date().toISOString(),
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error || "Failed to release reservation");
+        }
+
+        const data = await res.json();
+        alert(`Spot released! Total cost: ₹${data.parking_cost}`);
+
+        // Refresh data
+        this.fetchReservations();
+        this.fetchParkingLots();
+      } catch (err) {
+        alert(err.message);
+      }
+    },
+
     goToReservation(lotId, spotId) {
       if (!lotId || !spotId) return;
       this.$router.push({
@@ -98,9 +189,14 @@ export default {
         params: { lotId, spotId },
       });
     },
+
+    formatDate(dateStr) {
+      return new Date(dateStr).toLocaleString();
+    },
   },
   mounted() {
     this.fetchParkingLots();
+    this.fetchReservations();
   },
 };
 </script>
@@ -111,11 +207,13 @@ export default {
 }
 
 /* Card Styling */
-.parking-card {
+.parking-card,
+.reservation-card {
   border-radius: 15px;
   transition: transform 0.2s, box-shadow 0.2s;
 }
-.parking-card:hover {
+.parking-card:hover,
+.reservation-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
 }
