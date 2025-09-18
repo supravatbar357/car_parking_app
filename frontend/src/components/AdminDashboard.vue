@@ -3,44 +3,54 @@
     <h2 class="mb-4">Admin Dashboard</h2>
 
     <!-- Add Parking Lot Button -->
-    <div class="mb-4">
+    <div class="mb-4 text-end">
       <router-link to="/admindashboard/add-parking-lot" class="btn btn-danger">
-        Add Parking Lot
+        + Add Parking Lot
       </router-link>
     </div>
 
-    <!-- Parking Lots List -->
+    <!-- Loading -->
     <div v-if="loading" class="text-center">
       <p>Loading parking lots...</p>
     </div>
 
+    <!-- Error -->
     <div v-else-if="error" class="alert alert-danger">
       {{ error }}
     </div>
 
-    <div v-else-if="parkingLots.length > 0">
+    <!-- Parking Lots List -->
+    <div v-else-if="parkingLots.length > 0" class="row">
       <div
         v-for="lot in parkingLots"
         :key="lot.id"
-        class="card p-3 mb-3 shadow-sm"
+        class="col-md-6 col-lg-4 mb-4"
       >
-        <h5>{{ lot.prime_location_name }}</h5>
-        <p><strong>Price:</strong> {{ lot.price }}</p>
-        <p><strong>Address:</strong> {{ lot.address }}</p>
-        <p><strong>Pincode:</strong> {{ lot.pin_code }}</p>
-        <p><strong>Spots:</strong> {{ lot.number_of_spots }}</p>
-
-        <button class="btn btn-primary btn-sm me-2" @click="editLot(lot.id)">
-          Edit
-        </button>
-        <button class="btn btn-danger btn-sm" @click="deleteLot(lot.id)">
-          Delete
-        </button>
+        <div class="card h-100 shadow-sm hover-card">
+          <div class="card-body">
+            <h5 class="card-title">{{ lot.prime_location_name }}</h5>
+            <p class="card-text">
+              <span class="badge bg-success me-1">₹{{ lot.price }}/hr</span>
+              <span class="badge bg-primary">{{ lot.number_of_spots }} Spots</span>
+            </p>
+            <p class="card-text"><strong>Address:</strong> {{ lot.address }}</p>
+            <p class="card-text"><strong>Pincode:</strong> {{ lot.pin_code }}</p>
+          </div>
+          <div class="card-footer d-flex justify-content-between">
+            <button class="btn btn-primary btn-sm" @click="editLot(lot.id)">
+              Edit
+            </button>
+            <button class="btn btn-danger btn-sm" @click="deleteLot(lot.id)">
+              Delete
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
+    <!-- No lots -->
     <div v-else>
-      <p>No parking lots available.</p>
+      <p class="alert alert-info">No parking lots available.</p>
     </div>
   </div>
 </template>
@@ -80,9 +90,6 @@ export default {
         }
 
         const data = await response.json();
-        console.log("Parking lots API response:", data);
-
-        // handle both array and object responses
         this.parkingLots = Array.isArray(data)
           ? data
           : data.parking_lots || [];
@@ -103,22 +110,18 @@ export default {
       if (!token) return;
 
       try {
-        const response = await fetch(
-          `api/parking_lots/${id}`,
-          {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        const response = await fetch(`api/parking_lots/${id}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         if (!response.ok) {
           const errMsg = await response.text();
           throw new Error(`Delete failed: ${errMsg}`);
         }
 
-        // refresh list after delete
         this.fetchParkingLots();
       } catch (err) {
         console.error("Delete error:", err);
@@ -131,3 +134,16 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.hover-card {
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.hover-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+.card-footer {
+  background-color: #f8f9fa;
+}
+</style>

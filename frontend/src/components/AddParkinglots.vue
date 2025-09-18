@@ -1,74 +1,116 @@
 <template>
-  <div class="container mt-4">
-    <h2 class="mb-3">Parking Lots</h2>
+  <div class="container mt-5">
+    <h2 class="mb-4">Add Parking Lot</h2>
 
     <!-- Error message -->
     <div v-if="error" class="alert alert-danger">
       {{ error }}
     </div>
 
-    <!-- Loading -->
-    <div v-if="loading" class="text-center">
-      <span>Loading parking lots...</span>
+    <!-- Success message -->
+    <div v-if="success" class="alert alert-success">
+      {{ success }}
     </div>
 
-    <!-- Parking lots table -->
-    <table v-if="!loading && parkingLots.length" class="table table-striped">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Prime Location</th>
-          <th>Price</th>
-          <th>Address</th>
-          <th>Pin Code</th>
-          <th>Spots</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="lot in parkingLots" :key="lot.id">
-          <td>{{ lot.id }}</td>
-          <td>{{ lot.prime_location_name }}</td>
-          <td>{{ lot.price }}</td>
-          <td>{{ lot.address }}</td>
-          <td>{{ lot.pin_code }}</td>
-          <td>{{ lot.number_of_spots }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <form @submit.prevent="addParkingLot">
+      <div class="mb-3">
+        <label class="form-label">Prime Location Name</label>
+        <input
+          v-model="form.prime_location_name"
+          type="text"
+          class="form-control"
+          placeholder="Enter location name"
+          required
+        />
+      </div>
 
-    <!-- If no lots -->
-    <div v-if="!loading && !parkingLots.length" class="alert alert-info">
-      No parking lots found. Please add one.
-    </div>
+      <div class="mb-3">
+        <label class="form-label">Price (₹ per hour)</label>
+        <input
+          v-model.number="form.price"
+          type="number"
+          class="form-control"
+          placeholder="Enter price"
+          min="0"
+          required
+        />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Address</label>
+        <textarea
+          v-model="form.address"
+          class="form-control"
+          placeholder="Enter address"
+          required
+        ></textarea>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Pin Code</label>
+        <input
+          v-model="form.pin_code"
+          type="text"
+          class="form-control"
+          placeholder="Enter pincode"
+          pattern="\d{6}"
+          title="6 digit pin code"
+          required
+        />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Number of Spots</label>
+        <input
+          v-model.number="form.number_of_spots"
+          type="number"
+          class="form-control"
+          placeholder="Enter number of spots"
+          min="1"
+          required
+        />
+      </div>
+
+      <div class="d-flex justify-content-between">
+        <button type="submit" class="btn btn-success">Add Parking Lot</button>
+        <router-link to="/admindashboard" class="btn btn-secondary">Cancel</router-link>
+      </div>
+    </form>
   </div>
 </template>
 
 <script>
 export default {
-  name: "AdminDashboard",
+  name: "AddParkinglots",
   data() {
     return {
-      parkingLots: [],
-      loading: true,
+      form: {
+        prime_location_name: "",
+        price: null,
+        address: "",
+        pin_code: "",
+        number_of_spots: null,
+      },
       error: null,
+      success: null,
     };
   },
   methods: {
-    async fetchParkingLots() {
-      try {
-        const token = localStorage.getItem("token"); // JWT from login
-        if (!token) {
-          this.error = "Not authorized. Please log in again.";
-          this.loading = false;
-          return;
-        }
+    async addParkingLot() {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        this.error = "Not authorized. Please log in again.";
+        return;
+      }
 
-        const response = await fetch("http://127.0.0.1:5000/api/parking_lots", {
-          method: "GET",
+      try {
+        const response = await fetch("/api/parking_lots", {
+          method: "POST",
           headers: {
             "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json"
-          }
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(this.form),
         });
 
         if (!response.ok) {
@@ -76,23 +118,33 @@ export default {
           throw new Error(`Error ${response.status}: ${errText}`);
         }
 
-        const data = await response.json();
-        this.parkingLots = data.parking_lots || [];
+        this.success = "Parking lot added successfully!";
+        this.error = null;
+
+        // Reset form
+        this.form = {
+          prime_location_name: "",
+          price: null,
+          address: "",
+          pin_code: "",
+          number_of_spots: null,
+        };
+
+        // Redirect to Admin Dashboard after 1 second
+        setTimeout(() => {
+          this.$router.push("/admindashboard");
+        }, 1000);
       } catch (err) {
-        this.error = err.message || "Failed to fetch parking lots.";
-      } finally {
-        this.loading = false;
+        this.error = err.message || "Failed to add parking lot.";
+        this.success = null;
       }
     },
-  },
-  mounted() {
-    this.fetchParkingLots();
   },
 };
 </script>
 
 <style scoped>
 .container {
-  max-width: 900px;
+  max-width: 600px;
 }
 </style>
