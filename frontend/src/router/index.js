@@ -6,6 +6,8 @@ import RegisterView from '@/components/RegisterView.vue'
 import AdminDashboard from '@/components/AdminDashboard.vue'
 import UserDashboard from '@/components/UserDashboard.vue'
 import AddParkinglots from '@/components/AddParkinglots.vue'
+import EditParkinglots from '@/components/EditParkinglots.vue'
+import ReservationForm from '@/components/ReservationForm.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -27,14 +29,29 @@ const router = createRouter({
       component: AddParkinglots,
       meta: { requiresAuth: true, adminOnly: true }
     },
+    { 
+      path: '/admindashboard/edit-parking-lot/:id',   // <-- new route
+      name: 'EditParkinglots', 
+      component: EditParkinglots,
+      meta: { requiresAuth: true, adminOnly: true }
+    },
 
     // User Dashboard
     { 
-      path: '/user',
+      path: '/userdashboard',
       name: 'UserDashboard', 
       component: UserDashboard,
       meta: { requiresAuth: true }
     },
+    {
+     path: "/reservation/:lotId/:spotId",
+     name: "ReservationForm",
+     component: ReservationForm,
+     props: true,
+     
+    },
+
+    
   ],
 })
 

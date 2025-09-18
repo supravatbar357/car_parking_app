@@ -3,15 +3,19 @@ from applications.models import db, Users, ParkingLot, ParkingSpot
 from flask_restful import Resource, abort
 from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from .api import cache
 from .task import export_parking_data
-import json
-
 
 class ParkingLotsAPI(Resource):
     @jwt_required()
-    def get(self):
-        """Fetch all parking lots (accessible to both admin and normal users)."""
+    def get(self, lot_id=None):
+        """Fetch all parking lots or a single lot by ID."""
+        if lot_id:
+            lot = ParkingLot.query.get(lot_id)
+            if not lot:
+                abort(404, message="Parking lot not found")
+            return lot.convert_to_json(include_spots=True), 200
+
+        # Return all lots
         lots = ParkingLot.query.all()
         return {"parking_lots": [lot.convert_to_json(include_spots=True) for lot in lots]}, 200
 
@@ -33,6 +37,7 @@ class ParkingLotsAPI(Resource):
         if not all([prime_location_name, price, address, pin_code, number_of_spots]):
             abort(400, message="All fields are required")
 
+        # Create lot
         new_lot = ParkingLot(
             prime_location_name=prime_location_name,
             price=price,
@@ -73,16 +78,16 @@ class ParkingLotsAPI(Resource):
         if "pin_code" in data:
             lot.pin_code = data["pin_code"].strip()
         if "number_of_spots" in data:
-            difference = data["number_of_spots"] - lot.number_of_spots
-            if difference > 0:
-                for _ in range(difference):
+            diff = data["number_of_spots"] - lot.number_of_spots
+            if diff > 0:
+                for _ in range(diff):
                     spot = ParkingSpot(lot_id=lot.id, status="A")
                     db.session.add(spot)
-            elif difference < 0:
+            elif diff < 0:
                 spots_to_remove = ParkingSpot.query.filter_by(
                     lot_id=lot.id, status="A"
-                ).limit(-difference).all()
-                if len(spots_to_remove) < -difference:
+                ).limit(-diff).all()
+                if len(spots_to_remove) < -diff:
                     abort(400, message="Not enough available spots to remove")
                 for spot in spots_to_remove:
                     db.session.delete(spot)
@@ -103,16 +108,15 @@ class ParkingLotsAPI(Resource):
         if not lot:
             abort(404, message="Parking lot not found")
 
-        # Check if any spot is occupied
-        occupied_spots = ParkingSpot.query.filter_by(lot_id=lot.id, status="O").count()
-        if occupied_spots > 0:
+        # Check for occupied spots
+        occupied_count = ParkingSpot.query.filter_by(lot_id=lot.id, status="O").count()
+        if occupied_count > 0:
             abort(400, message="Cannot delete lot: some spots are still occupied")
 
         db.session.delete(lot)
         db.session.commit()
         return {"message": "Parking lot deleted successfully"}, 200
-
-
+    
 class ExportParkingDataAPI(Resource):
     @jwt_required()
     def post(self):

@@ -4,115 +4,150 @@ from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from flask_restful import Resource, abort
 from datetime import datetime
 from .api import cache
+from sqlalchemy.exc import SQLAlchemyError
+
 
 class ReservationAPI(Resource):
     @jwt_required()
-    @cache.cached(timeout=300)
     def get(self, reservation_id=None):
-        user_id = get_jwt_identity()
-        user = Users.query.get(user_id)
-        if not user:
-            abort(404, message="User not found")
+        try:
+            user_id = get_jwt_identity()
+            user = Users.query.get(user_id)
+            if not user:
+                return {"error": "User not found"}, 404
 
-        if reservation_id:
-            reservation = Reservation.query.get(reservation_id)
-            if not reservation or reservation.user_id != user.id:
-                abort(404, message="Reservation not found")
-            return reservation.convert_to_json(), 200
+            if reservation_id:
+                reservation = Reservation.query.get(reservation_id)
+                if not reservation or reservation.user_id != user.id:
+                    return {"error": "Reservation not found"}, 404
+                return reservation.convert_to_json(), 200
 
-        reservations = Reservation.query.filter_by(user_id=user.id).all()
-        return {"reservations": [res.convert_to_json() for res in reservations]}, 200
+            reservations = Reservation.query.filter_by(user_id=user.id).all()
+            return {"reservations": [res.convert_to_json() for res in reservations]}, 200
+
+        except Exception as e:
+            return {"error": "Internal server error", "details": str(e)}, 500
 
     @jwt_required()
     def post(self):
-        user_id = get_jwt_identity()
-        user = Users.query.get(user_id)
-        if not user:
-            abort(404, message="User not found")
-
-        data = request.json or {}
-        start_time = data.get("start_time")
-
-        if not start_time:
-            abort(400, message="start_time is required")
-
         try:
-            start_time_dt = datetime.fromisoformat(start_time)
-        except Exception:
-            abort(400, message="Invalid datetime format. Use ISO 8601")
+            user_id = get_jwt_identity()
+            user = Users.query.get(user_id)
+            if not user:
+                return {"error": "User not found"}, 404
 
-        # Assign first available spot automatically
-        spot = ParkingSpot.query.filter_by(status="A").first()
-        if not spot:
-            abort(400, message="No available parking spots")
+            data = request.get_json()
+            if not data:
+                return {"error": "Invalid request, JSON body required"}, 400
 
-        new_reservation = Reservation(
-            user_id=user.id,
-            spot_id=spot.id,
-            parking_timestamp=start_time_dt
-        )
-        db.session.add(new_reservation)
-        db.session.commit()
+            spot_id = data.get("spot_id")
+            if not spot_id:
+                return {"error": "spot_id is required"}, 400
 
-        return new_reservation.convert_to_json(), 201
+            start_time = data.get("start_time")
+            if start_time:
+                try:
+                    parking_dt = datetime.fromisoformat(start_time)
+                except Exception:
+                    return {"error": "Invalid datetime format. Use ISO 8601"}, 400
+            else:
+                parking_dt = datetime.utcnow()
+
+            spot = ParkingSpot.query.get(spot_id)
+            if not spot:
+                return {"error": "Parking spot not found"}, 404
+            if spot.status != "A":
+                return {"error": "Parking spot is not available"}, 400
+
+            new_reservation = Reservation(
+                user_id=user.id,
+                spot_id=spot.id,
+                parking_timestamp=parking_dt
+            )
+            spot.status = "R"  # Reserved
+            db.session.add(new_reservation)
+            db.session.commit()
+
+            return new_reservation.convert_to_json(), 201
+
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            return {"error": "Database error", "details": str(e)}, 500
+
+        except Exception as e:
+            return {"error": "Internal server error", "details": str(e)}, 500
 
     @jwt_required()
     def patch(self, reservation_id):
-        user_id = get_jwt_identity()
-        user = Users.query.get(user_id)
-        if not user:
-            abort(404, message="User not found")
+        try:
+            user_id = get_jwt_identity()
+            user = Users.query.get(user_id)
+            if not user:
+                return {"error": "User not found"}, 404
 
-        reservation = Reservation.query.get(reservation_id)
-        if not reservation or reservation.user_id != user.id:
-            abort(404, message="Reservation not found")
+            reservation = Reservation.query.get(reservation_id)
+            if not reservation or reservation.user_id != user.id:
+                return {"error": "Reservation not found"}, 404
 
-        data = request.json or {}
-        action = data.get("action")
+            data = request.get_json() or {}
+            action = data.get("action")
 
-        if action == "occupied":
-            reservation.spot.status = "O"  # Vehicle parked
-            db.session.commit()
-            return {"message": "Spot marked as occupied"}, 200
+            if action == "occupied":
+                reservation.spot.status = "O"
+                db.session.commit()
+                return {"message": "Spot marked as occupied"}, 200
 
-        elif action == "released":
-            leaving_time = data.get("leaving_time")
-            if not leaving_time:
-                abort(400, message="leaving_time is required")
+            elif action == "released":
+                leaving_time = data.get("leaving_time")
+                if not leaving_time:
+                    return {"error": "leaving_time is required"}, 400
 
-            try:
-                leaving_dt = datetime.fromisoformat(leaving_time)
-            except Exception:
-                abort(400, message="Invalid datetime format. Use ISO 8601")
+                try:
+                    leaving_dt = datetime.fromisoformat(leaving_time)
+                except Exception:
+                    return {"error": "Invalid datetime format. Use ISO 8601"}, 400
 
-            reservation.leaving_timestamp = leaving_dt
-            duration_hours = (leaving_dt - reservation.parking_timestamp).total_seconds() / 3600
+                reservation.leaving_timestamp = leaving_dt
+                duration_hours = (leaving_dt - reservation.parking_timestamp).total_seconds() / 3600
+                lot_price = reservation.spot.lot.price
+                reservation.parking_cost = round(duration_hours * lot_price, 2)
+                reservation.spot.status = "A"
 
-            lot_price = reservation.spot.lot.price
-            reservation.parking_cost = round(duration_hours * lot_price, 2)
+                db.session.commit()
+                return reservation.convert_to_json(), 200
 
-            reservation.spot.status = "A"  # Free spot
-            db.session.commit()
-            return reservation.convert_to_json(), 200
+            else:
+                return {"error": "Invalid action. Use 'occupied' or 'released'"}, 400
 
-        else:
-            abort(400, message="Invalid action. Use 'occupied' or 'released'")
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            return {"error": "Database error", "details": str(e)}, 500
+
+        except Exception as e:
+            return {"error": "Internal server error", "details": str(e)}, 500
 
     @jwt_required()
     def delete(self, reservation_id):
-        user_id = get_jwt_identity()
-        user = Users.query.get(user_id)
-        if not user:
-            abort(404, message="User not found")
+        try:
+            user_id = get_jwt_identity()
+            user = Users.query.get(user_id)
+            if not user:
+                return {"error": "User not found"}, 404
 
-        reservation = Reservation.query.get(reservation_id)
-        if not reservation or reservation.user_id != user.id:
-            abort(404, message="Reservation not found")
+            reservation = Reservation.query.get(reservation_id)
+            if not reservation or reservation.user_id != user.id:
+                return {"error": "Reservation not found"}, 404
 
-        if reservation.spot.status == "O":
-            abort(400, message="Cannot delete reservation after spot is occupied")
+            if reservation.spot.status == "O":
+                return {"error": "Cannot delete reservation after spot is occupied"}, 400
 
-        db.session.delete(reservation)
-        db.session.commit()
+            db.session.delete(reservation)
+            db.session.commit()
+            return {"message": "Reservation deleted successfully"}, 200
 
-        return {"message": "Reservation deleted successfully"}, 200
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            return {"error": "Database error", "details": str(e)}, 500
+
+        except Exception as e:
+            return {"error": "Internal server error", "details": str(e)}, 500
