@@ -3,7 +3,8 @@
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
       <div class="container-fluid">
-        <a class="navbar-brand fw-bold" href="#">Parking App</a>
+        <router-link class="navbar-brand fw-bold" to="/">Parking App</router-link>
+
         <button
           class="navbar-toggler"
           type="button"
@@ -15,10 +16,11 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto align-items-center">
+            
             <!-- If NOT logged in -->
             <template v-if="!isLoggedIn">
               <li class="nav-item">
-                <router-link to="/" class="nav-link">Home</router-link>
+                <router-link to="/about" class="nav-link">About</router-link>
               </li>
               <li class="nav-item">
                 <router-link to="/login" class="btn btn-outline-light mx-2">
@@ -43,10 +45,17 @@
                   data-bs-toggle="dropdown"
                   aria-expanded="false"
                 >
-                  <span class="me-2">👤</span> {{ userName }}
+                  <i class="bi bi-person-circle fs-4 me-2"></i> {{ userName }}
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
-                  <li>
+                  <!-- Show Admin Dashboard for admins -->
+                  <li v-if="userIsAdmin">
+                    <router-link to="/AdminDashboard" class="dropdown-item">
+                      Admin Dashboard
+                    </router-link>
+                  </li>
+                  <!-- Show Profile for normal users -->
+                  <li v-else>
                     <router-link to="/profile" class="dropdown-item">Profile</router-link>
                   </li>
                   <li><hr class="dropdown-divider" /></li>
@@ -58,6 +67,7 @@
                 </ul>
               </li>
             </template>
+
           </ul>
         </div>
       </div>
@@ -70,7 +80,7 @@
 
     <!-- Footer -->
     <footer class="bg-dark text-white text-center py-3 mt-auto">
-      <p class="mb-0">© 2025 Vehicle Parking App || All right reserved</p>
+      <p class="mb-0">© 2025 Vehicle Parking App. All rights reserved</p>
     </footer>
   </div>
 </template>
@@ -82,39 +92,36 @@ export default {
     return {
       isLoggedIn: false,
       userName: "",
+      userIsAdmin: false,
     };
   },
-  mounted() {
-    // Load from localStorage on refresh
-    const user = localStorage.getItem("user");
-    if (user) {
-      const parsed = JSON.parse(user);
-      this.isLoggedIn = true;
-      this.userName = parsed.name || "User";
-    }
-
-    // Listen for login event
-    this.$root.$on("user-logged-in", (user) => {
-      this.isLoggedIn = true;
-      this.userName = user.name || "User";
-    });
-
-    // Listen for logout event
-    this.$root.$on("user-logged-out", () => {
-      this.isLoggedIn = false;
-      this.userName = "";
-    });
+  created() {
+    this.checkAuth();
+    window.addEventListener("storage", this.checkAuth); // reactive update if localStorage changes
+  },
+  beforeUnmount() {
+    window.removeEventListener("storage", this.checkAuth);
   },
   methods: {
+    checkAuth() {
+      const token = localStorage.getItem("token");
+      const user = localStorage.getItem("user");
+
+      if (token && user) {
+        const parsed = JSON.parse(user);
+        this.isLoggedIn = true;
+        this.userName = parsed.name || "User";
+        this.userIsAdmin = parsed.is_admin || false;
+      } else {
+        this.isLoggedIn = false;
+        this.userName = "";
+        this.userIsAdmin = false;
+      }
+    },
     logout() {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
-      this.isLoggedIn = false;
-      this.userName = "";
-
-      // Notify globally
-      this.$root.$emit("user-logged-out");
-
+      this.checkAuth();
       this.$router.push("/login");
     },
   },

@@ -1,6 +1,6 @@
 from flask import request
 from flask_restful import Resource, abort
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import check_password_hash, generate_password_hash
 from applications.models import Users, db
 import re
@@ -51,7 +51,7 @@ class LoginAPI(Resource):
             }
         }, 200
 
-        
+
 class SignupAPI(Resource):
     def _validate_fields(self, name, email, password):
         if not name:
@@ -94,4 +94,20 @@ class SignupAPI(Resource):
         db.session.commit()
 
         return {"message": "User signup successful"}, 201
-    
+
+
+class ProfileAPI(Resource):
+    @jwt_required()
+    def get(self):
+        user_id = get_jwt_identity()
+        user = Users.query.get(user_id)
+
+        if not user:
+            abort(404, message="User not found")
+
+        return {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "is_admin": user.is_admin
+        }, 200

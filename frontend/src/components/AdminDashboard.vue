@@ -1,122 +1,46 @@
 <template>
-  <div class="container mt-4">
-    <h2 class="mb-4 text-center">Admin Dashboard - Manage Parking Lots</h2>
+  <div class="container mt-5">
+    <h2 class="mb-4">Admin Dashboard</h2>
 
-    <!-- Loading spinner -->
-    <div v-if="loading" class="text-center mt-3">
-      <span class="spinner-border spinner-border-sm"></span> Loading...
+    <!-- Add Parking Lot Button -->
+    <div class="mb-4">
+      <router-link to="/admindashboard/add-parking-lot" class="btn btn-danger">
+        Add Parking Lot
+      </router-link>
     </div>
 
-    <!-- Empty state -->
-    <div v-else-if="parkingLots.length === 0" class="text-center mt-5">
-      <div class="card empty-card p-4 shadow-sm">
-        <div class="icon mb-3">
-          <i class="bi bi-building-add" style="font-size: 3rem;"></i>
-        </div>
-        <h4>No Parking Lots Defined Yet</h4>
-        <p class="text-muted">
-          You have not added any parking lots. Click the button below to add your first parking lot.
-        </p>
-        <button
-          class="btn btn-success btn-lg add-btn"
-          @click="$router.push('/AdminDashboard/add-parking-lot')"
-        >
-          + Add New Parking Lot
+    <!-- Parking Lots List -->
+    <div v-if="loading" class="text-center">
+      <p>Loading parking lots...</p>
+    </div>
+
+    <div v-else-if="error" class="alert alert-danger">
+      {{ error }}
+    </div>
+
+    <div v-else-if="parkingLots.length > 0">
+      <div
+        v-for="lot in parkingLots"
+        :key="lot.id"
+        class="card p-3 mb-3 shadow-sm"
+      >
+        <h5>{{ lot.prime_location_name }}</h5>
+        <p><strong>Price:</strong> {{ lot.price }}</p>
+        <p><strong>Address:</strong> {{ lot.address }}</p>
+        <p><strong>Pincode:</strong> {{ lot.pin_code }}</p>
+        <p><strong>Spots:</strong> {{ lot.number_of_spots }}</p>
+
+        <button class="btn btn-primary btn-sm me-2" @click="editLot(lot.id)">
+          Edit
+        </button>
+        <button class="btn btn-danger btn-sm" @click="deleteLot(lot.id)">
+          Delete
         </button>
       </div>
     </div>
 
-    <!-- Parking Lots Table -->
     <div v-else>
-      <div class="mb-4 text-end">
-        <button
-          class="btn btn-success"
-          @click="$router.push('/AdminDashboard/add-parking-lot')"
-        >
-          + Add New Parking Lot
-        </button>
-      </div>
-
-      <table class="table table-striped table-bordered">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Location</th>
-            <th>Price</th>
-            <th>Address</th>
-            <th>Pin Code</th>
-            <th>Available Spots</th>
-            <th style="width: 180px;">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="lot in parkingLots" :key="lot.id">
-            <td>{{ lot.id }}</td>
-            <td>
-              <input
-                v-if="lot.editing"
-                v-model="lot.prime_location_name"
-                class="form-control"
-              />
-              <span v-else>{{ lot.prime_location_name }}</span>
-            </td>
-            <td>
-              <input
-                v-if="lot.editing"
-                v-model="lot.price"
-                type="number"
-                class="form-control"
-              />
-              <span v-else>₹{{ lot.price }}</span>
-            </td>
-            <td>
-              <input
-                v-if="lot.editing"
-                v-model="lot.address"
-                class="form-control"
-              />
-              <span v-else>{{ lot.address }}</span>
-            </td>
-            <td>
-              <input
-                v-if="lot.editing"
-                v-model="lot.pin_code"
-                class="form-control"
-              />
-              <span v-else>{{ lot.pin_code }}</span>
-            </td>
-            <td>
-              {{ lot.spots.filter(s => s.status === "A").length }} /
-              {{ lot.number_of_spots }}
-            </td>
-            <td>
-              <!-- Edit / Update -->
-              <button
-                v-if="!lot.editing"
-                class="btn btn-primary btn-sm me-1"
-                @click="enableEdit(lot)"
-              >
-                Edit
-              </button>
-              <button
-                v-else
-                class="btn btn-success btn-sm me-1"
-                @click="updateLot(lot)"
-              >
-                Save
-              </button>
-
-              <!-- Delete -->
-              <button
-                class="btn btn-danger btn-sm"
-                @click="deleteLot(lot)"
-              >
-                Delete
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <p>No parking lots available.</p>
     </div>
   </div>
 </template>
@@ -127,83 +51,78 @@ export default {
   data() {
     return {
       parkingLots: [],
-      loading: false,
+      loading: true,
+      error: null,
     };
   },
   methods: {
     async fetchParkingLots() {
-      this.loading = true;
-      try {
-        const token = localStorage.getItem("token");
-        const res = await fetch("/api/parking_lots", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error("Failed to fetch parking lots");
-        const data = await res.json();
-
-        this.parkingLots = data.parking_lots.map((lot) => ({
-          ...lot,
-          editing: false,
-        }));
-      } catch (err) {
-        console.error(err);
-        alert(err.message);
-      } finally {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        this.error = "Not authorized. Please log in again.";
         this.loading = false;
+        this.$router.push("/login");
+        return;
       }
-    },
 
-    enableEdit(lot) {
-      lot.editing = true;
-    },
-
-    async updateLot(lot) {
       try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`/api/parking_lots/${lot.id}`, {
-          method: "PUT",
+        const response = await fetch("/api/parking_lots", {
+          method: "GET",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            prime_location_name: lot.prime_location_name,
-            price: lot.price,
-            address: lot.address,
-            pin_code: lot.pin_code,
-            number_of_spots: lot.number_of_spots,
-          }),
         });
-        if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.message || "Failed to update lot");
+
+        if (!response.ok) {
+          const errMsg = await response.text();
+          throw new Error(`Error ${response.status}: ${errMsg}`);
         }
-        const updated = await res.json();
-        Object.assign(lot, updated, { editing: false });
-        alert("Updated successfully!");
+
+        const data = await response.json();
+        console.log("Parking lots API response:", data);
+
+        // handle both array and object responses
+        this.parkingLots = Array.isArray(data)
+          ? data
+          : data.parking_lots || [];
       } catch (err) {
-        console.error(err);
-        alert(err.message);
+        console.error("Fetch error:", err);
+        this.error = err.message || "Failed to fetch parking lots.";
+      } finally {
+        this.loading = false;
       }
     },
-
-    async deleteLot(lot) {
+    editLot(id) {
+      this.$router.push(`/admindashboard/edit-parking-lot/${id}`);
+    },
+    async deleteLot(id) {
       if (!confirm("Are you sure you want to delete this parking lot?")) return;
+
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
       try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`/api/parking_lots/${lot.id}`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.message || "Failed to delete lot");
+        const response = await fetch(
+          `api/parking_lots/${id}`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          const errMsg = await response.text();
+          throw new Error(`Delete failed: ${errMsg}`);
         }
-        this.parkingLots = this.parkingLots.filter((l) => l.id !== lot.id);
-        alert("Deleted successfully!");
+
+        // refresh list after delete
+        this.fetchParkingLots();
       } catch (err) {
-        console.error(err);
-        alert(err.message);
+        console.error("Delete error:", err);
+        alert("Failed to delete parking lot.");
       }
     },
   },
@@ -212,41 +131,3 @@ export default {
   },
 };
 </script>
-
-<style scoped>
-.table input {
-  width: 120px;
-}
-
-.empty-card {
-  background-color: #e9f7ef;
-  border-radius: 12px;
-  animation: fadeIn 0.8s ease-in-out;
-}
-
-.icon {
-  color: #28a745;
-  animation: bounce 1.2s infinite;
-}
-
-.add-btn {
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-}
-
-@keyframes bounce {
-  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
-  40% { transform: translateY(-10px); }
-  60% { transform: translateY(-5px); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-</style>

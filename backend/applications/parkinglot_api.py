@@ -5,16 +5,19 @@ from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from .api import cache
 from .task import export_parking_data
+import json
+
 
 class ParkingLotsAPI(Resource):
     @jwt_required()
-    @cache.cached(timeout=60)
     def get(self):
+        """Fetch all parking lots (accessible to both admin and normal users)."""
         lots = ParkingLot.query.all()
         return {"parking_lots": [lot.convert_to_json(include_spots=True) for lot in lots]}, 200
-    
+
     @jwt_required()
     def post(self):
+        """Admin: Add a new parking lot."""
         user_id = get_jwt_identity()
         user = Users.query.get(user_id)
         if not user or not user.is_admin:
@@ -46,10 +49,11 @@ class ParkingLotsAPI(Resource):
             db.session.add(spot)
         db.session.commit()
 
-        return new_lot.convert_to_json(include_spots=True), 201     
-    
+        return new_lot.convert_to_json(include_spots=True), 201
+
     @jwt_required()
     def put(self, lot_id):
+        """Admin: Update parking lot details."""
         user_id = get_jwt_identity()
         user = Users.query.get(user_id)
         if not user or not user.is_admin:
@@ -75,7 +79,9 @@ class ParkingLotsAPI(Resource):
                     spot = ParkingSpot(lot_id=lot.id, status="A")
                     db.session.add(spot)
             elif difference < 0:
-                spots_to_remove = ParkingSpot.query.filter_by(lot_id=lot.id, status="A").limit(-difference).all()
+                spots_to_remove = ParkingSpot.query.filter_by(
+                    lot_id=lot.id, status="A"
+                ).limit(-difference).all()
                 if len(spots_to_remove) < -difference:
                     abort(400, message="Not enough available spots to remove")
                 for spot in spots_to_remove:
@@ -84,10 +90,10 @@ class ParkingLotsAPI(Resource):
 
         db.session.commit()
         return lot.convert_to_json(include_spots=True), 200
-    
+
     @jwt_required()
     def delete(self, lot_id):
-        """Admin: Delete a parking lot only if all spots are available"""
+        """Admin: Delete a parking lot only if all spots are available."""
         user_id = get_jwt_identity()
         user = Users.query.get(user_id)
         if not user or not user.is_admin:
@@ -105,6 +111,7 @@ class ParkingLotsAPI(Resource):
         db.session.delete(lot)
         db.session.commit()
         return {"message": "Parking lot deleted successfully"}, 200
+
 
 class ExportParkingDataAPI(Resource):
     @jwt_required()

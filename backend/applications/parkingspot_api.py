@@ -2,7 +2,7 @@ from flask import current_app as request
 from applications.models import db, Users, ParkingLot, ParkingSpot
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_restful import Resource, abort
-from .api import cache
+from .api import cache 
 from .task import export_parking_data
 
 class ParkingSpotsAPI(Resource):
