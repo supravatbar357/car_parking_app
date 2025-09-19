@@ -1,9 +1,11 @@
 <template>
   <div id="app" class="d-flex flex-column min-vh-100">
     <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+    <nav class="navbar navbar-expand-lg custom-navbar shadow-sm">
       <div class="container-fluid">
-        <router-link class="navbar-brand fw-bold" to="/">Parking App</router-link>
+        <router-link class="navbar-brand fw-bold text-light" to="/">
+          🚗 Parking App
+        </router-link>
 
         <button
           class="navbar-toggler"
@@ -16,9 +18,11 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto align-items-center">
-            
             <!-- If NOT logged in -->
             <template v-if="!isLoggedIn">
+              <li class="nav-item">
+              <router-link to="/Home" class="nav-link">Home</router-link>
+              </li>
               <li class="nav-item">
                 <router-link to="/about" class="nav-link">About</router-link>
               </li>
@@ -28,7 +32,7 @@
                 </router-link>
               </li>
               <li class="nav-item">
-                <router-link to="/register" class="btn btn-primary">
+                <router-link to="/register" class="btn btn-warning fw-bold">
                   Register
                 </router-link>
               </li>
@@ -38,7 +42,7 @@
             <template v-else>
               <li class="nav-item dropdown">
                 <a
-                  class="nav-link dropdown-toggle d-flex align-items-center"
+                  class="nav-link dropdown-toggle d-flex align-items-center text-light"
                   href="#"
                   id="navbarDropdown"
                   role="button"
@@ -47,27 +51,28 @@
                 >
                   <i class="bi bi-person-circle fs-4 me-2"></i> {{ userName }}
                 </a>
-                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="navbarDropdown">
                   <!-- Show Admin Dashboard for admins -->
                   <li v-if="userIsAdmin">
                     <router-link to="/AdminDashboard" class="dropdown-item">
-                      Admin Dashboard
+                      <i class="bi bi-speedometer2 me-2"></i> Admin Dashboard
                     </router-link>
                   </li>
                   <!-- Show Profile for normal users -->
                   <li v-else>
-                    <router-link to="/profile" class="dropdown-item">Profile</router-link>
+                    <router-link to="/profile" class="dropdown-item">
+                      <i class="bi bi-person-lines-fill me-2"></i> Profile
+                    </router-link>
                   </li>
                   <li><hr class="dropdown-divider" /></li>
                   <li>
                     <button class="dropdown-item text-danger" @click="logout">
-                      Logout
+                      <i class="bi bi-box-arrow-right me-2"></i> Logout
                     </button>
                   </li>
                 </ul>
               </li>
             </template>
-
           </ul>
         </div>
       </div>
@@ -79,8 +84,8 @@
     </main>
 
     <!-- Footer -->
-    <footer class="bg-dark text-white text-center py-3 mt-auto">
-      <p class="mb-0">© 2025 Vehicle Parking App . All rights reserved</p>
+    <footer class="custom-footer text-center py-3 mt-auto">
+      <p class="mb-0">© 2025 Vehicle Parking App. All rights reserved</p>
     </footer>
   </div>
 </template>
@@ -97,7 +102,7 @@ export default {
   },
   created() {
     this.checkAuth();
-    window.addEventListener("storage", this.checkAuth); // reactive update if localStorage changes
+    window.addEventListener("storage", this.checkAuth);
   },
   beforeUnmount() {
     window.removeEventListener("storage", this.checkAuth);
@@ -127,3 +132,54 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+/* Navbar with gradient */
+.custom-navbar {
+  background: linear-gradient(90deg, #0a0f3c, #1f4e79, #007bff);
+  padding: 0.8rem 1rem;
+}
+.custom-navbar .nav-link {
+  color: white !important;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+.custom-navbar .nav-link:hover {
+  color: #ffc107 !important;
+}
+.navbar-brand {
+  font-size: 1.4rem;
+  color: #fff !important;
+  letter-spacing: 1px;
+}
+
+/* Dropdown menu */
+.dropdown-menu {
+  border-radius: 0.5rem;
+  border: none;
+  animation: fadeIn 0.2s ease-in-out;
+}
+.dropdown-item:hover {
+  background-color: #f8f9fa;
+}
+
+/* Footer with gradient */
+.custom-footer {
+  background: linear-gradient(90deg, #07192c, #6610f2);
+  color: white;
+  font-weight: 500;
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.15);
+}
+
+/* Smooth dropdown animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>

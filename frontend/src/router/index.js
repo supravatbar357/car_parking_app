@@ -8,13 +8,31 @@ import UserDashboard from '@/components/UserDashboard.vue'
 import AddParkinglots from '@/components/AddParkinglots.vue'
 import EditParkinglots from '@/components/EditParkinglots.vue'
 import ReservationForm from '@/components/ReservationForm.vue'
+import ProfileView from '@/components/ProfileView.vue' 
+import AboutView from '@/components/AboutView.vue'  
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: '/', name: 'home', component: HomeView },
+    // Redirect root "/" to "/Home"
+    { path: '/', redirect: '/Home' },
+
+    // Home page
+    { path: '/Home', name: 'Home', component: HomeView },
+
+    { path: '/about', name: 'About', component: AboutView },
+
+    // Auth
     { path: '/login', name: 'login', component: LoginView },
     { path: '/register', name: 'register', component: RegisterView },
+
+    // Profile
+    {
+      path: '/profile',
+      name: 'Profile',
+      component: ProfileView,
+      meta: { requiresAuth: true }   // ✅ Protected route
+    },
 
     // Admin Dashboard
     { 
@@ -30,7 +48,7 @@ const router = createRouter({
       meta: { requiresAuth: true, adminOnly: true }
     },
     { 
-      path: '/admindashboard/edit-parking-lot/:id',   // <-- new route
+      path: '/admindashboard/edit-parking-lot/:id',
       name: 'EditParkinglots', 
       component: EditParkinglots,
       meta: { requiresAuth: true, adminOnly: true }
@@ -43,15 +61,15 @@ const router = createRouter({
       component: UserDashboard,
       meta: { requiresAuth: true }
     },
-    {
-     path: "/reservation/:lotId/:spotId",
-     name: "ReservationForm",
-     component: ReservationForm,
-     props: true,
-     
-    },
 
-    
+    // Reservation
+    {
+      path: "/reservation/:lotId/:spotId",
+      name: "ReservationForm",
+      component: ReservationForm,
+      props: true,
+      meta: { requiresAuth: true }
+    },
   ],
 })
 
@@ -65,7 +83,7 @@ router.beforeEach((to, from, next) => {
   }
 
   if (to.meta.adminOnly && !user.is_admin) {
-    return next('/user')
+    return next('/userdashboard') // fixed path
   }
 
   next()
