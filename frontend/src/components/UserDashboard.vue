@@ -1,100 +1,83 @@
 <template>
   <div class="container mt-5">
-    <h2 class="mb-4 text-center">🚗 Available Parking Lots</h2>
+    <h3 class="mb-4 text-center text-primary">🚗 Parking Lots</h3>
 
-    <!-- Loading -->
-    <div v-if="loading" class="text-center">
-      <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Loading...</span>
+    <!-- Search bar -->
+    <div class="mb-3 d-flex">
+      <input
+        v-model="searchQuery"
+        type="text"
+        class="form-control me-2"
+        placeholder="Search by PIN code or location"
+      />
+      <button class="btn btn-outline-primary" @click="searchLots">Search</button>
+    </div>
+
+    <!-- Parking lots table -->
+    <table class="table table-bordered table-hover shadow">
+      <thead class="table-dark">
+        <tr>
+          <th>Lot ID</th>
+          <th>Address</th>
+          <th>Available Spots</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="lot in parkingLots" :key="lot.id">
+          <td>{{ lot.id }}</td>
+          <td>{{ lot.address }}</td>
+          <td>{{ lot.spots.filter(s => s.status === 'A').length }}/{{ lot.spots.length }}</td>
+          <td>
+            <router-link
+              :to="{ name: 'ReservationForm', params: { lotId: lot.id } }"
+              class="btn btn-success btn-sm"
+              :disabled="lot.spots.filter(s => s.status === 'A').length === 0"
+            >
+              Book
+            </router-link>
+          </td>
+        </tr>
+        <tr v-if="parkingLots.length === 0">
+          <td colspan="4" class="text-center text-muted">No parking lots found</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Tabs for reservations -->
+    <ul class="nav nav-tabs mt-4" role="tablist">
+      <li class="nav-item">
+        <button class="nav-link" :class="{ active: activeTab === 'active' }" @click="activeTab = 'active'">Active Reservations</button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'">Booking History</button>
+      </li>
+    </ul>
+
+    <!-- Active Reservations -->
+    <div v-show="activeTab === 'active'" class="mt-3">
+      <div v-if="activeReservations.length === 0" class="text-muted">No active reservations.</div>
+      <div v-for="res in activeReservations" :key="res.id" class="card mt-3 p-3 shadow-sm">
+        <p><strong>Reservation ID:</strong> {{ res.id }}</p>
+        <p><strong>Lot ID:</strong> {{ res.lot_id }}</p>
+        <p><strong>Spot ID:</strong> {{ res.spot_id }}</p>
+        <p><strong>Vehicle:</strong> {{ res.vehicle_number }}</p>
+        <p><strong>Start:</strong> {{ res.parking_timestamp }}</p>
+        <button class="btn btn-danger btn-sm" @click="releaseReservation(res.id)">Release</button>
       </div>
-      <p class="mt-2">Fetching parking lots...</p>
     </div>
 
-    <!-- Error -->
-    <div v-else-if="error" class="alert alert-danger text-center">
-      {{ error }}
-    </div>
-
-    <!-- Parking Lots -->
-    <div v-else-if="parkingLots.length > 0" class="row g-4">
-      <div
-        v-for="lot in parkingLots"
-        :key="lot.id"
-        class="col-md-6 col-lg-4"
-      >
-        <div class="card shadow-lg border-0 h-100 parking-card">
-          <div class="card-body">
-            <h5 class="card-title text-primary fw-bold">
-              {{ lot.prime_location_name }}
-            </h5>
-            <p class="mb-1"><strong>💰 Price:</strong> ₹{{ lot.price }} / hr</p>
-            <p class="mb-1"><strong>📍 Address:</strong> {{ lot.address }}</p>
-            <p class="mb-1"><strong>📮 Pin Code:</strong> {{ lot.pin_code }}</p>
-            <p class="mb-3"><strong>🅿️ Total Spots:</strong> {{ lot.number_of_spots }}</p>
-
-            <h6 class="fw-bold">Parking Spots</h6>
-            <div class="d-flex flex-wrap gap-2">
-              <button
-                v-for="spot in lot.spots"
-                :key="spot.id"
-                :class="[
-                  'spot-btn',
-                  spot.status === 'A' ? 'available' : 'occupied'
-                ]"
-                :disabled="spot.status !== 'A'"
-                @click="goToReservation(lot.id, spot.id)"
-              >
-                #{{ spot.id }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- No Lots -->
-    <div v-else class="text-center mt-5">
-      <p class="text-muted">No parking lots available at the moment.</p>
-    </div>
-
-    <!-- My Reservations -->
-    <div class="mt-5">
-      <h2 class="mb-4 text-center">📋 My Reservations</h2>
-
-      <div v-if="myReservations.length === 0" class="text-center text-muted">
-        No active reservations.
-      </div>
-
-      <div v-else class="row g-4">
-        <div
-          v-for="res in myReservations"
-          :key="res.id"
-          class="col-md-6 col-lg-4"
-        >
-          <div class="card shadow-lg border-0 h-100 reservation-card">
-            <div class="card-body">
-              <h5 class="card-title fw-bold text-success">
-                Reservation #{{ res.id }}
-              </h5>
-              <p><strong>🅿️ Spot:</strong> #{{ res.spot_id }}</p>
-              <p><strong>⏰ Start:</strong> {{ formatDate(res.parking_timestamp) }}</p>
-              <p v-if="res.leaving_timestamp">
-                <strong>🏁 Left:</strong> {{ formatDate(res.leaving_timestamp) }}
-              </p>
-              <p v-if="res.parking_cost">
-                <strong>💰 Cost:</strong> ₹{{ res.parking_cost }}
-              </p>
-
-              <button
-                class="btn btn-warning w-100 mt-2"
-                v-if="!res.leaving_timestamp"
-                @click="releaseReservation(res.id)"
-              >
-                Release Spot
-              </button>
-            </div>
-          </div>
-        </div>
+    <!-- Booking History -->
+    <div v-show="activeTab === 'history'" class="mt-3">
+      <div v-if="historyReservations.length === 0" class="text-muted">No past bookings.</div>
+      <div v-for="res in historyReservations" :key="res.id" class="card mt-3 p-3 shadow-sm">
+        <p><strong>Reservation ID:</strong> {{ res.id }}</p>
+        <p><strong>Lot ID:</strong> {{ res.lot_id }}</p>
+        <p><strong>Spot ID:</strong> {{ res.spot_id }}</p>
+        <p><strong>Vehicle:</strong> {{ res.vehicle_number }}</p>
+        <p><strong>Start:</strong> {{ res.parking_timestamp }}</p>
+        <p><strong>End:</strong> {{ res.leaving_timestamp || 'Ongoing' }}</p>
+        <p><strong>Cost:</strong> {{ res.parking_cost || 'Pending' }}</p>
       </div>
     </div>
   </div>
@@ -106,92 +89,64 @@ export default {
   data() {
     return {
       parkingLots: [],
-      myReservations: [],
-      loading: true,
-      error: null,
+      reservations: [],
+      searchQuery: "",
+      activeTab: "active",
     };
+  },
+  computed: {
+    activeReservations() {
+      return this.reservations.filter(res => !res.leaving_timestamp);
+    },
+    historyReservations() {
+      return this.reservations.filter(res => res.leaving_timestamp);
+    },
   },
   methods: {
     async fetchParkingLots() {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        this.$router.push("/login");
-        return;
-      }
-
       try {
-        const res = await fetch("/api/parking_lots", {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`/api/parking_lots`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-
-        if (!res.ok) throw new Error("Failed to fetch parking lots");
-
         const data = await res.json();
         this.parkingLots = data.parking_lots || [];
       } catch (err) {
-        this.error = err.message;
-      } finally {
-        this.loading = false;
+        console.error("Error fetching parking lots:", err);
+      }
+    },
+
+    async searchLots() {
+      try {
+        const token = localStorage.getItem("token");
+        const url = this.searchQuery
+          ? `/api/parking_lots?query=${this.searchQuery}`
+          : `/api/parking_lots`;
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        this.parkingLots = data.parking_lots || [];
+      } catch (err) {
+        console.error("Error searching parking lots:", err);
       }
     },
 
     async fetchReservations() {
-      const token = localStorage.getItem("token");
       try {
-        const res = await fetch("/api/reservations", {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`/api/reservations`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-
-        if (!res.ok) throw new Error("Failed to fetch reservations");
-
         const data = await res.json();
-        this.myReservations = data.reservations || [];
+        this.reservations = data.reservations || [];
       } catch (err) {
-        this.error = err.message;
+        console.error("Error fetching reservations:", err);
       }
     },
 
-    async releaseReservation(reservationId) {
-      const token = localStorage.getItem("token");
-      try {
-        const res = await fetch(`/api/reservations/${reservationId}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            action: "released",
-            leaving_time: new Date().toISOString(),
-          }),
-        });
-
-        if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.error || "Failed to release reservation");
-        }
-
-        const data = await res.json();
-        alert(`Spot released! Total cost: ₹${data.parking_cost}`);
-
-        // Refresh data
-        this.fetchReservations();
-        this.fetchParkingLots();
-      } catch (err) {
-        alert(err.message);
-      }
-    },
-
-    goToReservation(lotId, spotId) {
-      if (!lotId || !spotId) return;
-      this.$router.push({
-        name: "ReservationForm",
-        params: { lotId, spotId },
-      });
-    },
-
-    formatDate(dateStr) {
-      return new Date(dateStr).toLocaleString();
+    releaseReservation(id) {
+      this.$router.push({ name: "ReleaseForm", params: { id } });
     },
   },
   mounted() {
@@ -202,43 +157,11 @@ export default {
 </script>
 
 <style scoped>
-.container {
-  max-width: 1100px;
+.table-hover tbody tr:hover {
+  background-color: #f5f5f5;
 }
-
-/* Card Styling */
-.parking-card,
-.reservation-card {
-  border-radius: 15px;
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-.parking-card:hover,
-.reservation-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
-}
-
-/* Spot Buttons */
-.spot-btn {
-  min-width: 50px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: none;
-  font-weight: bold;
+.nav-tabs .nav-link.active {
+  background-color: #0d6efd;
   color: white;
-  cursor: pointer;
-  transition: transform 0.15s ease-in-out;
-}
-.spot-btn:hover:enabled {
-  transform: scale(1.1);
-}
-
-.spot-btn.available {
-  background-color: #28a745; /* Green */
-}
-.spot-btn.occupied {
-  background-color: #dc3545; /* Red */
-  cursor: not-allowed;
-  opacity: 0.7;
 }
 </style>

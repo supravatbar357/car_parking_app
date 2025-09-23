@@ -1,13 +1,12 @@
 from flask import current_app as request
-from applications.models import db, Users, ParkingLot, ParkingSpot
+from applications.models import db, Users, ParkingLot, ParkingSpot, Reservation
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_restful import Resource, abort
-from .api import cache 
-from .task import export_parking_data
+from .api import cache
 
 class ParkingSpotsAPI(Resource):
     @jwt_required()
-    @cache.cached(timeout=300)
+    @cache.memoize(timeout=60)
     def get(self, lot_id):
         user_id = get_jwt_identity()
         user = Users.query.get(user_id)
@@ -21,9 +20,17 @@ class ParkingSpotsAPI(Resource):
         spots_data = []
         for spot in lot.spots:
             spot_info = spot.convert_to_json()
-            if spot.status == "O" and spot.reservation:
-                # Include reservation details for occupied spots
-                spot_info["reservation"] = spot.reservation.convert_to_json()
+
+            if spot.status == "O":
+                active_reservation = Reservation.query.filter_by(
+                    spot_id=spot.id, leaving_timestamp=None
+                ).first()
+                if active_reservation:
+                    reservation_info = active_reservation.convert_to_json()
+                    spot_info["reservation"] = reservation_info
+                    spot_info["user_id"] = active_reservation.user_id
+                    spot_info["car_number"] = getattr(active_reservation, "car_number", None)
+
             spots_data.append(spot_info)
 
         return {"parking_spots": spots_data}, 200
@@ -39,7 +46,7 @@ class ParkingSpotsAPI(Resource):
         if not spot:
             abort(404, message="Parking spot not found in this lot")
 
-        data = request.json or {}
+        data = request.get_json() or {}
         status = data.get("status", "").upper()
         if status not in ["A", "O"]:
             abort(400, message="Invalid status. Use 'A' or 'O'")
@@ -47,30 +54,51 @@ class ParkingSpotsAPI(Resource):
         spot.status = status
         db.session.commit()
 
+        # Clear cache after update
+        cache.delete_memoized(ParkingSpotsAPI.get)
+
         spot_data = spot.convert_to_json()
-        if spot.status == "O" and spot.reservation:
-            spot_data["reservation"] = spot.reservation.convert_to_json()
+        if spot.status == "O":
+            active_reservation = Reservation.query.filter_by(
+                spot_id=spot.id, leaving_timestamp=None
+            ).first()
+            if active_reservation:
+                reservation_info = active_reservation.convert_to_json()
+                spot_data["reservation"] = reservation_info
+                spot_data["user_id"] = active_reservation.user_id
+                spot_data["car_number"] = getattr(active_reservation, "car_number", None)
 
         return spot_data, 200
 
-class ExportParkingDataAPI(Resource):
     @jwt_required()
-    def post(self):
-        email = request.json.get("email")
-        if not email:
-            return {"message": "Email is required"}, 400
+    def delete(self, lot_id, spot_id):
+        """Allow admin to delete a parking spot only if it's not occupied"""
+        user_id = get_jwt_identity()
+        user = Users.query.get(user_id)
+        if not user or not user.is_admin:
+            abort(403, message="Admin access required")
 
-        parking_info = []
-        lots = ParkingLot.query.all()
-        for lot in lots:
-            for spot in lot.spots:
-                parking_info.append({
-                    "lot_name": lot.name,
-                    "spot_id": spot.id,
-                    "status": spot.status,
-                    "price_per_hour": spot.price_per_hour
-                })
+        spot = ParkingSpot.query.filter_by(id=spot_id, lot_id=lot_id).first()
+        if not spot:
+            abort(404, message="Parking spot not found in this lot")
 
-        export_parking_data.delay(parking_info, email)
-        return {"message": "Export task started. You will receive an email soon."}, 202
+        if spot.status == "O":
+            active_reservation = Reservation.query.filter_by(
+                spot_id=spot.id, leaving_timestamp=None
+            ).first()
+            details = {
+                "message": "Cannot delete occupied spot",
+                "reservation": active_reservation.convert_to_json() if active_reservation else None
+            }
+            if active_reservation:
+                details["user_id"] = active_reservation.user_id
+                details["car_number"] = getattr(active_reservation, "car_number", None)
+            return details, 400
 
+        db.session.delete(spot)
+        db.session.commit()
+
+        # Clear cache after deletion
+        cache.delete_memoized(ParkingSpotsAPI.get)
+
+        return {"message": "Parking spot deleted successfully"}, 200

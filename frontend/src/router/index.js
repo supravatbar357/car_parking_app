@@ -9,7 +9,8 @@ import AddParkinglots from '@/components/AddParkinglots.vue'
 import EditParkinglots from '@/components/EditParkinglots.vue'
 import ReservationForm from '@/components/ReservationForm.vue'
 import ProfileView from '@/components/ProfileView.vue' 
-import AboutView from '@/components/AboutView.vue'  
+import AboutView from '@/components/AboutView.vue'
+import ReleaseForm from '@/components/ReleaseForm.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -62,11 +63,20 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
 
-    // Reservation
-    {
-      path: "/reservation/:lotId/:spotId",
-      name: "ReservationForm",
+    // Reservation Form (Lot ID is passed as param)
+    { 
+      path: '/reservation/:lotId',
+      name: 'ReservationForm',
       component: ReservationForm,
+      props: true,
+      meta: { requiresAuth: true }
+    },
+
+    // Release Form (Reservation ID is passed as param)
+    { 
+      path: '/release/:id',
+      name: 'ReleaseForm',
+      component: ReleaseForm,
       props: true,
       meta: { requiresAuth: true }
     },

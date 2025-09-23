@@ -1,23 +1,50 @@
 from flask import current_app as app, request
-from applications.models import db, Users, ParkingLot, ParkingSpot
+from applications.models import db, Users, ParkingLot, ParkingSpot, Reservation
 from flask_restful import Resource, abort
-from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from .task import export_parking_data
+from .api import cache
+
 
 class ParkingLotsAPI(Resource):
     @jwt_required()
+    @cache.memoize(timeout=60)
     def get(self, lot_id=None):
-        """Fetch all parking lots or a single lot by ID."""
+        """Fetch parking lots. If lot_id is provided, fetch specific lot."""
+        user_id = get_jwt_identity()
+        user = Users.query.get(user_id)
+        if not user:
+            abort(403, message="User not found")
+
+        def build_spot_data(spot):
+            """Helper to attach reservation details if spot is occupied."""
+            spot_info = spot.convert_to_json()
+            if spot.status == "O" and spot.reservations:
+                # Pick the latest reservation by timestamp
+                latest_reservation = sorted(
+                    spot.reservations, key=lambda r: r.parking_timestamp
+                )[-1]
+
+                spot_info["reservation"] = latest_reservation.convert_to_json()
+                spot_info["user_id"] = latest_reservation.user_id
+                spot_info["car_number"] = getattr(latest_reservation, "vehicle_number", None)
+            return spot_info
+
         if lot_id:
             lot = ParkingLot.query.get(lot_id)
             if not lot:
                 abort(404, message="Parking lot not found")
-            return lot.convert_to_json(include_spots=True), 200
 
-        # Return all lots
+            spots_data = [build_spot_data(spot) for spot in lot.spots]
+            return {**lot.convert_to_json(include_spots=False), "spots": spots_data}, 200
+
         lots = ParkingLot.query.all()
-        return {"parking_lots": [lot.convert_to_json(include_spots=True) for lot in lots]}, 200
+        lots_data = []
+        for lot in lots:
+            spots_data = [build_spot_data(spot) for spot in lot.spots]
+            lots_data.append({**lot.convert_to_json(include_spots=False), "spots": spots_data})
+
+        return {"parking_lots": lots_data}, 200
 
     @jwt_required()
     def post(self):
@@ -36,8 +63,9 @@ class ParkingLotsAPI(Resource):
 
         if not all([prime_location_name, price, address, pin_code, number_of_spots]):
             abort(400, message="All fields are required")
+        if price <= 0 or number_of_spots <= 0:
+            abort(400, message="Price and number_of_spots must be positive numbers")
 
-        # Create lot
         new_lot = ParkingLot(
             prime_location_name=prime_location_name,
             price=price,
@@ -53,6 +81,9 @@ class ParkingLotsAPI(Resource):
             spot = ParkingSpot(lot_id=new_lot.id, status="A")
             db.session.add(spot)
         db.session.commit()
+
+        # Clear cached GET data
+        cache.delete_memoized(ParkingLotsAPI.get)
 
         return new_lot.convert_to_json(include_spots=True), 201
 
@@ -78,22 +109,28 @@ class ParkingLotsAPI(Resource):
         if "pin_code" in data:
             lot.pin_code = data["pin_code"].strip()
         if "number_of_spots" in data:
-            diff = data["number_of_spots"] - lot.number_of_spots
-            if diff > 0:
-                for _ in range(diff):
+            difference = data["number_of_spots"] - lot.number_of_spots
+            if difference > 0:
+                for _ in range(difference):
                     spot = ParkingSpot(lot_id=lot.id, status="A")
                     db.session.add(spot)
-            elif diff < 0:
-                spots_to_remove = ParkingSpot.query.filter_by(
-                    lot_id=lot.id, status="A"
-                ).limit(-diff).all()
-                if len(spots_to_remove) < -diff:
-                    abort(400, message="Not enough available spots to remove")
+            elif difference < 0:
+                spots_to_remove = ParkingSpot.query.filter_by(lot_id=lot.id, status="A").limit(-difference).all()
+                if len(spots_to_remove) < -difference:
+                    abort(
+                        400,
+                        message=f"Cannot reduce to {data['number_of_spots']} spots. "
+                                f"Only {len(spots_to_remove)} free spots available."
+                    )
                 for spot in spots_to_remove:
                     db.session.delete(spot)
             lot.number_of_spots = data["number_of_spots"]
 
         db.session.commit()
+
+        # Clear cache after update
+        cache.delete_memoized(ParkingLotsAPI.get)
+
         return lot.convert_to_json(include_spots=True), 200
 
     @jwt_required()
@@ -108,15 +145,20 @@ class ParkingLotsAPI(Resource):
         if not lot:
             abort(404, message="Parking lot not found")
 
-        # Check for occupied spots
-        occupied_count = ParkingSpot.query.filter_by(lot_id=lot.id, status="O").count()
-        if occupied_count > 0:
+        # Check if any spot is occupied
+        occupied_spots = ParkingSpot.query.filter_by(lot_id=lot.id, status="O").count()
+        if occupied_spots > 0:
             abort(400, message="Cannot delete lot: some spots are still occupied")
 
         db.session.delete(lot)
         db.session.commit()
+
+        # Clear cache after deletion
+        cache.delete_memoized(ParkingLotsAPI.get)
+
         return {"message": "Parking lot deleted successfully"}, 200
-    
+
+
 class ExportParkingDataAPI(Resource):
     @jwt_required()
     def post(self):
@@ -129,10 +171,10 @@ class ExportParkingDataAPI(Resource):
         for lot in lots:
             for spot in lot.spots:
                 parking_info.append({
-                    "lot_name": lot.name,
+                    "lot_name": lot.prime_location_name,
                     "spot_id": spot.id,
                     "status": spot.status,
-                    "price_per_hour": float(spot.price_per_hour)  # Ensure JSON serializable
+                    "price_per_hour": float(lot.price)  # ensure JSON serializable
                 })
 
         # Trigger Celery task

@@ -1,81 +1,85 @@
 <template>
-  <div class="container mt-5">
-    <h2 class="mb-4">Add Parking Lot</h2>
+  <div class="d-flex justify-content-center align-items-center min-vh-100 bg-light">
+    <div class="card shadow-lg rounded-4 form-window">
+      <div class="card-body p-4">
+        <h2 class="mb-4 text-center text-primary fw-bold">Add Parking Lot</h2>
 
-    <!-- Error message -->
-    <div v-if="error" class="alert alert-danger">
-      {{ error }}
+        <!-- Error message -->
+        <div v-if="error" class="alert alert-danger">
+          {{ error }}
+        </div>
+
+        <!-- Success message -->
+        <div v-if="success" class="alert alert-success">
+          {{ success }}
+        </div>
+
+        <form @submit.prevent="addParkingLot">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Prime Location Name</label>
+            <input
+              v-model="form.prime_location_name"
+              type="text"
+              class="form-control"
+              placeholder="Enter location name"
+              required
+            />
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Price (₹ per hour)</label>
+            <input
+              v-model.number="form.price"
+              type="number"
+              class="form-control"
+              placeholder="Enter price"
+              min="0"
+              required
+            />
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Address</label>
+            <textarea
+              v-model="form.address"
+              class="form-control"
+              placeholder="Enter address"
+              required
+            ></textarea>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Pin Code</label>
+            <input
+              v-model="form.pin_code"
+              type="text"
+              class="form-control"
+              placeholder="Enter pincode"
+              pattern="\d{6}"
+              title="6 digit pin code"
+              required
+            />
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Number of Spots</label>
+            <input
+              v-model.number="form.number_of_spots"
+              type="number"
+              class="form-control"
+              placeholder="Enter number of spots"
+              min="1"
+              required
+            />
+          </div>
+
+          <div class="d-flex justify-content-between mt-4">
+            <button type="submit" class="btn btn-success px-4">Add</button>
+            <router-link to="/admindashboard" class="btn btn-outline-secondary px-4">Cancel</router-link>
+          </div>
+        </form>
+      </div>
     </div>
-
-    <!-- Success message -->
-    <div v-if="success" class="alert alert-success">
-      {{ success }}
-    </div>
-
-    <form @submit.prevent="addParkingLot">
-      <div class="mb-3">
-        <label class="form-label">Prime Location Name</label>
-        <input
-          v-model="form.prime_location_name"
-          type="text"
-          class="form-control"
-          placeholder="Enter location name"
-          required
-        />
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Price (₹ per hour)</label>
-        <input
-          v-model.number="form.price"
-          type="number"
-          class="form-control"
-          placeholder="Enter price"
-          min="0"
-          required
-        />
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Address</label>
-        <textarea
-          v-model="form.address"
-          class="form-control"
-          placeholder="Enter address"
-          required
-        ></textarea>
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Pin Code</label>
-        <input
-          v-model="form.pin_code"
-          type="text"
-          class="form-control"
-          placeholder="Enter pincode"
-          pattern="\d{6}"
-          title="6 digit pin code"
-          required
-        />
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Number of Spots</label>
-        <input
-          v-model.number="form.number_of_spots"
-          type="number"
-          class="form-control"
-          placeholder="Enter number of spots"
-          min="1"
-          required
-        />
-      </div>
-
-      <div class="d-flex justify-content-between">
-        <button type="submit" class="btn btn-success">Add Parking Lot</button>
-        <router-link to="/admindashboard" class="btn btn-secondary">Cancel</router-link>
-      </div>
-    </form>
   </div>
 </template>
 
@@ -144,7 +148,9 @@ export default {
 </script>
 
 <style scoped>
-.container {
+.form-window {
+  width: 100%;
   max-width: 600px;
+  background: #fff;
 }
 </style>

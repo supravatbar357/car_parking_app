@@ -1,41 +1,38 @@
 <template>
-  <div class="container mt-5">
-    <div class="card shadow-lg p-4 reservation-card">
-      <h3 class="mb-4 text-center text-primary">📝 Reservation Form</h3>
+  <div class="container mt-4">
+    <div class="card shadow p-4">
+      <h3 class="text-center text-primary">📝 Reservation Form</h3>
 
-      <!-- Alerts -->
-      <div v-if="error" class="alert alert-danger text-center">{{ error }}</div>
-      <div v-if="success" class="alert alert-success text-center">{{ success }}</div>
-
-      <form @submit.prevent="makeReservation">
-        <!-- Lot ID -->
+      <form @submit.prevent="reserveSpot">
         <div class="mb-3">
-          <label class="form-label fw-bold">Lot ID</label>
-          <input type="text" class="form-control" v-model="lotId" disabled />
+          <label class="form-label">Lot ID</label>
+          <input type="text" v-model="form.lot_id" class="form-control" readonly />
         </div>
 
-        <!-- Spot ID -->
         <div class="mb-3">
-          <label class="form-label fw-bold">Spot ID</label>
-          <input type="text" class="form-control" v-model="spotId" disabled />
+          <label class="form-label">Spot ID</label>
+          <input type="text" v-model="form.spot_id" class="form-control" readonly />
         </div>
 
-        <!-- Start Time -->
         <div class="mb-3">
-          <label class="form-label fw-bold">Start Time</label>
-          <input
-            type="datetime-local"
-            class="form-control"
-            v-model="startTime"
-            required
-          />
-          <small class="text-muted">Select the time you plan to park (ISO format).</small>
+          <label class="form-label">User ID</label>
+          <input type="text" v-model="form.user_id" class="form-control" readonly />
         </div>
 
-        <!-- Submit -->
-        <button type="submit" class="btn btn-primary w-100">
-          Confirm Reservation
-        </button>
+        <div class="mb-3">
+          <label class="form-label">Start Time</label>
+          <input type="text" v-model="form.start_time" class="form-control" readonly />
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Vehicle Number</label>
+          <input type="text" v-model="form.vehicle_no" class="form-control" required />
+        </div>
+
+        <div class="d-flex justify-content-between">
+          <button type="submit" class="btn btn-success">Reserve</button>
+          <button type="button" class="btn btn-secondary" @click="$router.push('/userdashboard')">Cancel</button>
+        </div>
       </form>
     </div>
   </div>
@@ -46,53 +43,58 @@ export default {
   name: "ReservationForm",
   data() {
     return {
-      lotId: this.$route.params.lotId,
-      spotId: this.$route.params.spotId,
-      startTime: "",
-      error: null,
-      success: null,
+      form: {
+        lot_id: this.$route.params.lotId || "",
+        spot_id: "",
+        user_id: "",
+        start_time: new Date().toISOString(),
+        vehicle_no: ""
+      }
     };
   },
-  methods: {
-    async makeReservation() {
+  async mounted() {
+    try {
       const token = localStorage.getItem("token");
-      if (!token) {
-        this.error = "You must be logged in to make a reservation.";
-        return;
+
+      // Get logged-in user
+      const userRes = await fetch(`/api/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const userData = await userRes.json();
+      this.form.user_id = userData.id;
+
+      // Assign first available spot (backend should handle logic)
+      const spotRes = await fetch(`/api/parking_lots/${this.form.lot_id}/spots`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const spots = await spotRes.json();
+      const availableSpot = spots.find(s => s.status === "A");
+      if (availableSpot) {
+        this.form.spot_id = availableSpot.id;
       }
-
-      try {
-        const res = await fetch("/api/reservations", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            spot_id: this.spotId,
-            lot_id: this.lotId,  // optional, backend ignores if unused
-            start_time: this.startTime,
-          }),
-        });
-
-        if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.error || "Failed to create reservation");
-        }
-
-        await res.json();
-        this.success = "✅ Reservation created successfully!";
-        this.error = null;
-
-        // Redirect after short delay
-        setTimeout(() => {
-          this.$router.push("/UserDashboard");
-        }, 1500);
-      } catch (err) {
-        this.error = err.message || "Failed to create reservation";
-        this.success = null;
-      }
-    },
+    } catch (err) {
+      console.error(err);
+    }
   },
+  methods: {
+    async reserveSpot() {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`/api/reservations`, {
+          method: "POST",
+          headers: { 
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json" 
+          },
+          body: JSON.stringify(this.form)
+        });
+        if (!res.ok) throw new Error("Reservation failed");
+        alert("Reservation successful!");
+        this.$router.push("/userdashboard");
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  }
 };
 </script>

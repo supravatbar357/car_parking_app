@@ -5,15 +5,14 @@ from applications.models import db, create_default_admin
 from applications.config import Config
 from applications.worker import make_celery
 from applications.routes import register_routes
-from flask_caching import Cache
+from applications.api import cache  # <-- import here
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
 db.init_app(app)
 
-# Initialize cache
-cache = Cache(app, config={"CACHE_TYPE": "SimpleCache"})
+cache.init_app(app, config={"CACHE_TYPE": "SimpleCache"})  # <-- initialize imported cache
 
 jwt = JWTManager(app)
 api = Api(app)

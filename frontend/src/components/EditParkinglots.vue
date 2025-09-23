@@ -1,80 +1,88 @@
 <template>
   <div class="container mt-5">
-    <h2 class="mb-4">Edit Parking Lot</h2>
+    <div class="card shadow-lg p-4 rounded-4">
+      <h2 class="mb-4 text-center text-primary fw-bold">✏️ Edit Parking Lot</h2>
 
-    <!-- Error message -->
-    <div v-if="error" class="alert alert-danger">
-      {{ error }}
-    </div>
-
-    <!-- Success message -->
-    <div v-if="success" class="alert alert-success">
-      {{ success }}
-    </div>
-
-    <form v-if="lotLoaded" @submit.prevent="updateParkingLot">
-      <div class="mb-3">
-        <label class="form-label">Prime Location Name</label>
-        <input
-          v-model="form.prime_location_name"
-          type="text"
-          class="form-control"
-          placeholder="Enter location name"
-          required
-        />
+      <!-- Error message -->
+      <div v-if="error" class="alert alert-danger text-center fw-semibold">
+        {{ error }}
       </div>
 
-      <div class="mb-3">
-        <label class="form-label">Price (₹ per hour)</label>
-        <input
-          v-model.number="form.price"
-          type="number"
-          class="form-control"
-          placeholder="Enter price"
-          required
-        />
+      <!-- Success message -->
+      <div v-if="success" class="alert alert-success text-center fw-semibold">
+        {{ success }}
       </div>
 
-      <div class="mb-3">
-        <label class="form-label">Address</label>
-        <textarea
-          v-model="form.address"
-          class="form-control"
-          placeholder="Enter address"
-          required
-        ></textarea>
-      </div>
+      <form v-if="lotLoaded" @submit.prevent="updateParkingLot">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Prime Location Name</label>
+          <input
+            v-model="form.prime_location_name"
+            type="text"
+            class="form-control rounded-3"
+            placeholder="Enter location name"
+            required
+          />
+        </div>
 
-      <div class="mb-3">
-        <label class="form-label">Pin Code</label>
-        <input
-          v-model="form.pin_code"
-          type="text"
-          class="form-control"
-          placeholder="Enter pincode"
-          required
-        />
-      </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Price (₹ per hour)</label>
+          <input
+            v-model.number="form.price"
+            type="number"
+            class="form-control rounded-3"
+            placeholder="Enter price"
+            required
+          />
+        </div>
 
-      <div class="mb-3">
-        <label class="form-label">Number of Spots</label>
-        <input
-          v-model.number="form.number_of_spots"
-          type="number"
-          class="form-control"
-          placeholder="Enter number of spots"
-          required
-        />
-      </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Address</label>
+          <textarea
+            v-model="form.address"
+            class="form-control rounded-3"
+            placeholder="Enter address"
+            rows="3"
+            required
+          ></textarea>
+        </div>
 
-      <div class="d-flex justify-content-between">
-        <button type="submit" class="btn btn-primary">Update Parking Lot</button>
-        <router-link to="/admindashboard" class="btn btn-secondary">Cancel</router-link>
-      </div>
-    </form>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Pin Code</label>
+          <input
+            v-model="form.pin_code"
+            type="text"
+            class="form-control rounded-3"
+            placeholder="Enter pincode"
+            required
+          />
+        </div>
 
-    <div v-else class="text-center">
-      <p>Loading parking lot details...</p>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Number of Spots</label>
+          <input
+            v-model.number="form.number_of_spots"
+            type="number"
+            class="form-control rounded-3"
+            placeholder="Enter number of spots"
+            required
+          />
+        </div>
+
+        <div class="d-flex justify-content-between mt-4">
+          <button type="submit" class="btn btn-success px-4 fw-semibold rounded-3">
+            ✅ Update
+          </button>
+          <router-link to="/admindashboard" class="btn btn-outline-secondary px-4 fw-semibold rounded-3">
+            ❌ Cancel
+          </router-link>
+        </div>
+      </form>
+
+      <div v-else class="text-center text-muted mt-3 fw-semibold">
+        <div class="spinner-border text-primary mb-2"></div>
+        <p>Loading parking lot details...</p>
+      </div>
     </div>
   </div>
 </template>
@@ -157,7 +165,7 @@ export default {
           throw new Error(`Error ${response.status}: ${errText}`);
         }
 
-        this.success = "Parking lot updated successfully!";
+        this.success = "✅ Parking lot updated successfully!";
         this.error = null;
 
         setTimeout(() => {
@@ -177,6 +185,19 @@ export default {
 
 <style scoped>
 .container {
-  max-width: 600px;
+  max-width: 650px;
+}
+.card {
+  background: #ffffff;
+  border: none;
+}
+.form-control {
+  padding: 10px;
+}
+.btn {
+  transition: all 0.2s ease-in-out;
+}
+.btn:hover {
+  transform: scale(1.05);
 }
 </style>

@@ -55,6 +55,7 @@ class ParkingLot(db.Model):
             data["spots"] = [spot.convert_to_json() for spot in self.spots]
         return data
 
+
 class ParkingSpot(db.Model):
     __tablename__ = "parking_spots"
 
@@ -62,7 +63,7 @@ class ParkingSpot(db.Model):
     lot_id = db.Column(db.Integer, db.ForeignKey("parking_lots.id"), nullable=False)
     status = db.Column(db.String(1), default="A")  # A = Available, O = Occupied
 
-    reservation = db.relationship("Reservation", backref="spot", uselist=False)
+    reservations = db.relationship("Reservation", backref="spot", lazy=True)
 
     def __repr__(self):
         return f"<ParkingSpot {self.id} - Lot {self.lot_id} - Status {self.status}>"
@@ -79,20 +80,22 @@ class Reservation(db.Model):
     __tablename__ = "reservations"
 
     id = db.Column(db.Integer, primary_key=True)
-    spot_id = db.Column(db.Integer, db.ForeignKey("parking_spots.id"), nullable=False, unique=True)
+    spot_id = db.Column(db.Integer, db.ForeignKey("parking_spots.id"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    vehicle_number = db.Column(db.String(20), nullable=False)
     parking_timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     leaving_timestamp = db.Column(db.DateTime, nullable=True)
     parking_cost = db.Column(db.Float, nullable=True)
 
     def __repr__(self):
-        return f"<Reservation User {self.user_id} - Spot {self.spot_id}>"
+        return f"<Reservation User {self.user_id} - Spot {self.spot_id} - Vehicle {self.vehicle_number}>"
     
     def convert_to_json(self):
         return {
             "id": self.id,
             "spot_id": self.spot_id,
             "user_id": self.user_id,
+            "vehicle_number": self.vehicle_number,
             "parking_timestamp": self.parking_timestamp.isoformat(),
             "leaving_timestamp": self.leaving_timestamp.isoformat() if self.leaving_timestamp else None,
             "parking_cost": self.parking_cost

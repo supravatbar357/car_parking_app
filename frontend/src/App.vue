@@ -165,7 +165,7 @@ export default {
 
 /* Footer with gradient */
 .custom-footer {
-  background: linear-gradient(90deg, #07192c, #6610f2);
+  background: linear-gradient(90deg, #0a0f3c, #1f4e79, #007bff);
   color: white;
   font-weight: 500;
   box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.15);
