@@ -11,13 +11,15 @@ class Config:
     SQLALCHEMY_DATABASE_URI = "sqlite:///" + os.path.join(base_dir, "database.sqlite3")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    CACHE_TYPE = 'redis'
-    CACHE_REDIS_HOST = 'localhost'
+    # Redis cache configuration
+    CACHE_TYPE = "RedisCache"
+    CACHE_REDIS_HOST = "localhost"
     CACHE_REDIS_PORT = 6379
     CACHE_REDIS_DB = 0
-    CACHE_REDIS_URL = 'redis://localhost:6379'
-    CACHE_DEFAULT_TIMEOUT = 3000
+    CACHE_DEFAULT_TIMEOUT = 300  # 5 min expiry
 
-    CELERY_BROKER_URL = 'redis://localhost:6379/0'
-    CELERY_RESULT_BACKEND = 'redis://localhost:6379/1'
-    CELERY_TIMEZONE = 'UTC'
+    # Celery + Redis backend
+    CELERY_BROKER_URL = "redis://localhost:6379/0"
+    CELERY_RESULT_BACKEND = "redis://localhost:6379/1"
+    CELERY_TIMEZONE = "Asia/Kolkata"  # match your timezone
+    CELERY_ENABLE_UTC = False

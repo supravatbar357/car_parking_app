@@ -71,10 +71,10 @@
 
         <div class="d-flex justify-content-between mt-4">
           <button type="submit" class="btn btn-success px-4 fw-semibold rounded-3">
-            ✅ Update
+            Update
           </button>
           <router-link to="/admindashboard" class="btn btn-outline-secondary px-4 fw-semibold rounded-3">
-            ❌ Cancel
+            Cancel
           </router-link>
         </div>
       </form>

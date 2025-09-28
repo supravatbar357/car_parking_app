@@ -2,7 +2,9 @@ from flask import current_app as app, request
 from applications.models import db, Users, ParkingLot, ParkingSpot, Reservation
 from flask_restful import Resource, abort
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from .task import export_parking_data
+from flask_restful import Resource
+from flask import request, jsonify
+from applications.tasks import export_parking_data
 from .api import cache
 
 
@@ -159,13 +161,29 @@ class ParkingLotsAPI(Resource):
         return {"message": "Parking lot deleted successfully"}, 200
 
 
+from flask import request, jsonify, url_for
+from flask_restful import Resource
+from flask_jwt_extended import jwt_required
+from applications.models import ParkingLot, ParkingSpot
+from applications.tasks import export_parking_data
+from applications.worker import celery
+import os
+
+EXPORTS_DIR = os.path.join(os.getcwd(), "exports")
+os.makedirs(EXPORTS_DIR, exist_ok=True)  # ensure folder exists
+
 class ExportParkingDataAPI(Resource):
     @jwt_required()
     def post(self):
+        """
+        Trigger CSV export of parking data for all lots and spots.
+        Returns task_id to track progress.
+        """
         email = request.json.get("email")
         if not email:
             return {"message": "Email is required"}, 400
 
+        # Collect parking info
         parking_info = []
         lots = ParkingLot.query.all()
         for lot in lots:
@@ -174,12 +192,28 @@ class ExportParkingDataAPI(Resource):
                     "lot_name": lot.prime_location_name,
                     "spot_id": spot.id,
                     "status": spot.status,
-                    "price_per_hour": float(lot.price)  # ensure JSON serializable
+                    "price_per_hour": float(lot.price)
                 })
 
-        # Trigger Celery task
-        export_parking_data.delay(parking_info, email)
+        # Trigger async Celery task
+        task = export_parking_data.delay(parking_info, email)
 
         return {
-            "message": "Export task started. You will receive an email soon."
+            "message": "Export task started. Use task_id to check status.",
+            "task_id": task.id
         }, 202
+
+
+class ExportStatusAPI(Resource):
+    def get(self, task_id):
+        """
+        Check status of a Celery task
+        """
+        res = celery.AsyncResult(task_id)
+        info = None
+        try:
+            info = res.result or res.info
+        except Exception:
+            info = res.info
+
+        return {"task_id": task_id, "state": res.state, "info": info}, 200

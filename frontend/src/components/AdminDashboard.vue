@@ -22,6 +22,16 @@
           Users
         </button>
       </li>
+      <li class="nav-item">
+        <!-- Navigate to /admin/summary -->
+        <router-link
+          class="nav-link"
+          :class="{ active: $route.path === '/admin/summary' }"
+          to="/admin/summary"
+        >
+          Summary
+        </router-link>
+      </li>
     </ul>
 
     <!-- Parking Lots Tab -->
@@ -32,17 +42,14 @@
         </router-link>
       </div>
 
-      <!-- Loading -->
       <div v-if="loading" class="text-center">
         <p>Loading parking lots...</p>
       </div>
 
-      <!-- Error -->
       <div v-else-if="error" class="alert alert-danger">
         {{ error }}
       </div>
 
-      <!-- Parking Lots -->
       <div v-else-if="parkingLots.length > 0" class="row">
         <div
           v-for="lot in parkingLots"
@@ -59,7 +66,6 @@
               <p class="card-text"><strong>Address:</strong> {{ lot.address }}</p>
               <p class="card-text"><strong>Pincode:</strong> {{ lot.pin_code }}</p>
 
-              <!-- Parking Spots -->
               <div class="spots-grid" v-if="lot.spots">
                 <div
                   v-for="spot in lot.spots"
@@ -84,7 +90,6 @@
         </div>
       </div>
 
-      <!-- No lots -->
       <div v-else>
         <p class="alert alert-info">No parking lots available.</p>
       </div>
@@ -125,6 +130,9 @@
         </table>
       </div>
     </div>
+
+    <!-- Router outlet for summary page -->
+    <router-view v-if="$route.path === '/admin/summary'"></router-view>
   </div>
 </template>
 
@@ -149,22 +157,12 @@ export default {
     async fetchParkingLots() {
       const token = localStorage.getItem("token");
       try {
-        const response = await fetch("/api/parking_lots", {
+        const res = await fetch("/api/parking_lots", {
           headers: { Authorization: `Bearer ${token}` },
         });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Error ${response.status}: ${errorText}`);
-        }
-
-        const data = await response.json();
-        console.log("Fetched lots:", data);
-
-        // handle both { parking_lots: [...] } and [ ... ]
-        this.parkingLots = data.parking_lots || data || [];
+        const data = await res.json();
+        this.parkingLots = data.parking_lots || [];
       } catch (err) {
-        console.error("Fetch error:", err);
         this.error = "Failed to fetch parking lots.";
       } finally {
         this.loading = false;
@@ -173,20 +171,13 @@ export default {
     async fetchUsers() {
       const token = localStorage.getItem("token");
       try {
-        const response = await fetch("/api/users", {
+        const res = await fetch("/api/users", {
           headers: { Authorization: `Bearer ${token}` },
         });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Error ${response.status}: ${errorText}`);
-        }
-
-        const data = await response.json();
-        console.log("Fetched users:", data);
-        this.users = data.users || data || [];
+        const data = await res.json();
+        this.users = data.users || [];
       } catch (err) {
-        console.error("Error fetching users:", err);
+        console.error(err);
       }
     },
     editLot(id) {
@@ -196,15 +187,12 @@ export default {
       if (!confirm("Are you sure you want to delete this parking lot?")) return;
       const token = localStorage.getItem("token");
       try {
-        const response = await fetch(`/api/parking_lots/${id}`, {
+        const res = await fetch(`/api/parking_lots/${id}`, {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (response.ok) {
-          this.fetchParkingLots();
-        } else {
-          alert("Failed to delete parking lot.");
-        }
+        if (res.ok) this.fetchParkingLots();
+        else alert("Failed to delete parking lot.");
       } catch (err) {
         console.error("Delete error:", err);
       }

@@ -1,13 +1,13 @@
-from celery import shared_task
-from celery.schedules import crontab
+from applications.worker import celery
+from flask import current_app as app
+from applications.models import Users, Reservation, ParkingLot, ParkingSpot
 from jinja2 import Template
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email import encoders
 import csv, os, smtplib
-from applications.models import Users, Reservation, ParkingLot, ParkingSpot
-from flask import current_app as app
 
+# ---------------- Helper Functions ----------------
 def dispatch_email(receiver, subject, html_body, attachment=None):
     smtp_host, smtp_port = "localhost", 1025
     sender, sender_pass = "noreply@parkingapp.com", ""
@@ -35,8 +35,8 @@ def render_html_report(username, booking_data):
         template = Template(f.read())
     return template.render(username=username, reservations=booking_data)
 
-# ------------------- Celery tasks -------------------
-@shared_task
+# ---------------- Celery Tasks ----------------
+@celery.task
 def send_daily_reminders():
     with app.app_context():
         users = Users.query.filter_by(is_admin=False).all()
@@ -48,7 +48,7 @@ def send_daily_reminders():
             dispatch_email(user.email, "Your Parking Reservations - Reminder", msg)
     print("[TASK] Daily reminders dispatched.")
 
-@shared_task
+@celery.task
 def monthly_summary():
     with app.app_context():
         users = Users.query.filter_by(is_admin=False).all()
@@ -62,7 +62,7 @@ def monthly_summary():
             dispatch_email(user.email, "Your Monthly Parking Report", report_html)
     print("[TASK] Monthly reports sent.")
 
-@shared_task
+@celery.task
 def export_parking_data(parking_info, email):
     csv_file = "parking_data_export.csv"
     fieldnames = ["lot_name", "spot_id", "status", "price_per_hour"]

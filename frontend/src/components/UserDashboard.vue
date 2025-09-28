@@ -1,83 +1,101 @@
 <template>
   <div class="container mt-5">
-    <h3 class="mb-4 text-center text-primary">🚗 Parking Lots</h3>
+    <h2 class="text-center mb-4 text-primary fw-bold">🚗 Smart Parking Dashboard</h2>
 
     <!-- Search bar -->
-    <div class="mb-3 d-flex">
+    <div class="mb-4 d-flex justify-content-center flex-wrap">
       <input
         v-model="searchQuery"
         type="text"
-        class="form-control me-2"
+        class="form-control w-50 me-2 mb-2"
         placeholder="Search by PIN code or location"
       />
-      <button class="btn btn-outline-primary" @click="searchLots">Search</button>
+      <button class="btn btn-primary mb-2" @click="searchLots">Search</button>
     </div>
 
-    <!-- Parking lots table -->
-    <table class="table table-bordered table-hover shadow">
-      <thead class="table-dark">
-        <tr>
-          <th>Lot ID</th>
-          <th>Address</th>
-          <th>Available Spots</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="lot in parkingLots" :key="lot.id">
-          <td>{{ lot.id }}</td>
-          <td>{{ lot.address }}</td>
-          <td>{{ lot.spots.filter(s => s.status === 'A').length }}/{{ lot.spots.length }}</td>
-          <td>
-            <router-link
-              :to="{ name: 'ReservationForm', params: { lotId: lot.id } }"
-              class="btn btn-success btn-sm"
-              :disabled="lot.spots.filter(s => s.status === 'A').length === 0"
-            >
-              Book
-            </router-link>
-          </td>
-        </tr>
-        <tr v-if="parkingLots.length === 0">
-          <td colspan="4" class="text-center text-muted">No parking lots found</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <!-- Tabs for reservations -->
-    <ul class="nav nav-tabs mt-4" role="tablist">
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mt-4">
       <li class="nav-item">
-        <button class="nav-link" :class="{ active: activeTab === 'active' }" @click="activeTab = 'active'">Active Reservations</button>
+        <button class="nav-link" :class="{ active: activeTab === 'lots' }" @click="activeTab = 'lots'">
+          Parking Lots
+        </button>
       </li>
       <li class="nav-item">
-        <button class="nav-link" :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'">Booking History</button>
+        <button class="nav-link" :class="{ active: activeTab === 'active' }" @click="activeTab = 'active'">
+          Active Reservations
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'">
+          Booking History
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" @click="goToSummary">
+          Summary
+        </button>
       </li>
     </ul>
 
+    <!-- Parking Lots -->
+    <div v-if="activeTab === 'lots'" class="row g-3 mt-3">
+      <div v-for="lot in parkingLots" :key="lot.id" class="col-sm-12 col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm hover-card">
+          <div class="card-body d-flex flex-column justify-content-between">
+            <div>
+              <h5 class="card-title">Lot #{{ lot.id }}</h5>
+              <p class="card-text">{{ lot.address }}</p>
+              <p>
+                <span class="badge bg-success me-2">{{ lot.spots.filter(s => s.status === 'A').length }} Available</span>
+                <span class="badge bg-secondary">{{ lot.spots.length }} Total</span>
+              </p>
+            </div>
+            <router-link
+              :to="{ name: 'ReservationForm', params: { lotId: lot.id } }"
+              class="btn btn-success w-100 mt-2"
+              :disabled="lot.spots.filter(s => s.status === 'A').length === 0"
+            >
+              Book Now
+            </router-link>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Active Reservations -->
-    <div v-show="activeTab === 'active'" class="mt-3">
-      <div v-if="activeReservations.length === 0" class="text-muted">No active reservations.</div>
-      <div v-for="res in activeReservations" :key="res.id" class="card mt-3 p-3 shadow-sm">
-        <p><strong>Reservation ID:</strong> {{ res.id }}</p>
-        <p><strong>Lot ID:</strong> {{ res.lot_id }}</p>
-        <p><strong>Spot ID:</strong> {{ res.spot_id }}</p>
-        <p><strong>Vehicle:</strong> {{ res.vehicle_number }}</p>
-        <p><strong>Start:</strong> {{ res.parking_timestamp }}</p>
-        <button class="btn btn-danger btn-sm" @click="releaseReservation(res.id)">Release</button>
+    <div v-if="activeTab === 'active'" class="row g-3 mt-3">
+      <div v-if="activeReservations.length === 0" class="col-12 text-muted text-center py-3">No active reservations.</div>
+      <div v-for="res in activeReservations" :key="res.id" class="col-sm-12 col-md-6 col-lg-4">
+        <div class="card shadow-sm border-primary hover-card">
+          <div class="card-body d-flex flex-column justify-content-between">
+            <div>
+              <h6 class="fw-bold">Reservation #{{ res.id }}</h6>
+              <p class="mb-1"><strong>Lot:</strong> {{ res.lot_id }}</p>
+              <p class="mb-1"><strong>Spot:</strong> {{ res.spot_id }}</p>
+              <p class="mb-1"><strong>Vehicle:</strong> {{ res.vehicle_number }}</p>
+              <p class="mb-0"><strong>Start:</strong> {{ res.parking_timestamp }}</p>
+            </div>
+            <button class="btn btn-danger mt-2" @click="releaseReservation(res.id)">Release</button>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Booking History -->
-    <div v-show="activeTab === 'history'" class="mt-3">
-      <div v-if="historyReservations.length === 0" class="text-muted">No past bookings.</div>
-      <div v-for="res in historyReservations" :key="res.id" class="card mt-3 p-3 shadow-sm">
-        <p><strong>Reservation ID:</strong> {{ res.id }}</p>
-        <p><strong>Lot ID:</strong> {{ res.lot_id }}</p>
-        <p><strong>Spot ID:</strong> {{ res.spot_id }}</p>
-        <p><strong>Vehicle:</strong> {{ res.vehicle_number }}</p>
-        <p><strong>Start:</strong> {{ res.parking_timestamp }}</p>
-        <p><strong>End:</strong> {{ res.leaving_timestamp || 'Ongoing' }}</p>
-        <p><strong>Cost:</strong> {{ res.parking_cost || 'Pending' }}</p>
+    <div v-if="activeTab === 'history'" class="row g-3 mt-3">
+      <div v-if="historyReservations.length === 0" class="col-12 text-muted text-center py-3">No past bookings.</div>
+      <div v-for="res in historyReservations" :key="res.id" class="col-sm-12 col-md-6 col-lg-4">
+        <div class="card shadow-sm border-secondary hover-card">
+          <div class="card-body">
+            <h6 class="fw-bold">Reservation #{{ res.id }}</h6>
+            <p class="mb-1"><strong>Lot:</strong> {{ res.lot_id }}</p>
+            <p class="mb-1"><strong>Spot:</strong> {{ res.spot_id }}</p>
+            <p class="mb-1"><strong>Vehicle:</strong> {{ res.vehicle_number }}</p>
+            <p class="mb-1"><strong>Start:</strong> {{ res.parking_timestamp }}</p>
+            <p class="mb-1"><strong>End:</strong> {{ res.leaving_timestamp || 'Ongoing' }}</p>
+            <p class="mb-0"><strong>Cost:</strong> {{ res.parking_cost || 'Pending' }}</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -91,7 +109,7 @@ export default {
       parkingLots: [],
       reservations: [],
       searchQuery: "",
-      activeTab: "active",
+      activeTab: "lots",
     };
   },
   computed: {
@@ -104,49 +122,29 @@ export default {
   },
   methods: {
     async fetchParkingLots() {
-      try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`/api/parking_lots`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        this.parkingLots = data.parking_lots || [];
-      } catch (err) {
-        console.error("Error fetching parking lots:", err);
-      }
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/parking_lots", { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      this.parkingLots = data.parking_lots || [];
     },
-
     async searchLots() {
-      try {
-        const token = localStorage.getItem("token");
-        const url = this.searchQuery
-          ? `/api/parking_lots?query=${this.searchQuery}`
-          : `/api/parking_lots`;
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        this.parkingLots = data.parking_lots || [];
-      } catch (err) {
-        console.error("Error searching parking lots:", err);
-      }
+      const token = localStorage.getItem("token");
+      const url = this.searchQuery ? `/api/parking_lots?query=${this.searchQuery}` : `/api/parking_lots`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      this.parkingLots = data.parking_lots || [];
     },
-
     async fetchReservations() {
-      try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`/api/reservations`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        this.reservations = data.reservations || [];
-      } catch (err) {
-        console.error("Error fetching reservations:", err);
-      }
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/reservations", { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      this.reservations = data.reservations || [];
     },
-
     releaseReservation(id) {
       this.$router.push({ name: "ReleaseForm", params: { id } });
+    },
+    goToSummary() {
+      this.$router.push({ name: "UserSummary" });
     },
   },
   mounted() {
@@ -157,11 +155,24 @@ export default {
 </script>
 
 <style scoped>
-.table-hover tbody tr:hover {
-  background-color: #f5f5f5;
+.hover-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  border-radius: 12px;
+}
+.hover-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 20px rgba(0,0,0,0.15);
 }
 .nav-tabs .nav-link.active {
   background-color: #0d6efd;
   color: white;
+  font-weight: 600;
+}
+.card {
+  border-radius: 10px;
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

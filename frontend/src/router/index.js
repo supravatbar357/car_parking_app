@@ -11,16 +11,15 @@ import ReservationForm from '@/components/ReservationForm.vue'
 import ProfileView from '@/components/ProfileView.vue' 
 import AboutView from '@/components/AboutView.vue'
 import ReleaseForm from '@/components/ReleaseForm.vue'
+import UserSummary from '@/components/charts/UserSummary.vue'
+import AdminSummary from '@/components/charts/AdminSummary.vue'
+
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    // Redirect root "/" to "/Home"
     { path: '/', redirect: '/Home' },
-
-    // Home page
     { path: '/Home', name: 'Home', component: HomeView },
-
     { path: '/about', name: 'About', component: AboutView },
 
     // Auth
@@ -32,15 +31,18 @@ const router = createRouter({
       path: '/profile',
       name: 'Profile',
       component: ProfileView,
-      meta: { requiresAuth: true }   // ✅ Protected route
+      meta: { requiresAuth: true }
     },
 
-    // Admin Dashboard
+    // Admin Dashboard with nested Summary
     { 
       path: '/admindashboard',
-      name: 'AdminDashboard', 
-      component: AdminDashboard, 
-      meta: { requiresAuth: true, adminOnly: true }
+      component: AdminDashboard,
+      meta: { requiresAuth: true, adminOnly: true },
+      children: [
+        { path: '', name: 'AdminHome', component: AdminDashboard },
+        { path: 'summary', name: 'AdminSummary', component: AdminDashboard }
+      ]
     },
     { 
       path: '/admindashboard/add-parking-lot',
@@ -55,15 +57,18 @@ const router = createRouter({
       meta: { requiresAuth: true, adminOnly: true }
     },
 
-    // User Dashboard
+    // User Dashboard with nested Summary
     { 
       path: '/userdashboard',
-      name: 'UserDashboard', 
       component: UserDashboard,
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
+      children: [
+        { path: '', name: 'UserHome', component: UserDashboard },
+        { path: 'summary', name: 'UserSummary', component: UserDashboard }
+      ]
     },
 
-    // Reservation Form (Lot ID is passed as param)
+    // Reservation and Release
     { 
       path: '/reservation/:lotId',
       name: 'ReservationForm',
@@ -71,8 +76,6 @@ const router = createRouter({
       props: true,
       meta: { requiresAuth: true }
     },
-
-    // Release Form (Reservation ID is passed as param)
     { 
       path: '/release/:id',
       name: 'ReleaseForm',
@@ -80,6 +83,19 @@ const router = createRouter({
       props: true,
       meta: { requiresAuth: true }
     },
+    {
+     path: "/user/summary",
+     name: "UserSummary",
+     component: UserSummary,
+     meta: { requiresAuth: true }
+    },
+    {
+     path: "/admin/summary",
+     name: "AdminSummary",
+     component: AdminSummary,
+     meta: { requiresAuth: true, adminOnly: true }
+     },
+
   ],
 })
 
@@ -93,7 +109,7 @@ router.beforeEach((to, from, next) => {
   }
 
   if (to.meta.adminOnly && !user.is_admin) {
-    return next('/userdashboard') // fixed path
+    return next('/userdashboard')
   }
 
   next()
