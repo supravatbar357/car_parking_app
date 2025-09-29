@@ -23,14 +23,13 @@
         </button>
       </li>
       <li class="nav-item">
-        <!-- Navigate to /admin/summary -->
-        <router-link
+        <button
           class="nav-link"
-          :class="{ active: $route.path === '/admin/summary' }"
-          to="/admin/summary"
+          :class="{ active: activeTab === 'summary' }"
+          @click="activeTab = 'summary'"
         >
           Summary
-        </router-link>
+        </button>
       </li>
     </ul>
 
@@ -42,20 +41,11 @@
         </router-link>
       </div>
 
-      <div v-if="loading" class="text-center">
-        <p>Loading parking lots...</p>
-      </div>
-
-      <div v-else-if="error" class="alert alert-danger">
-        {{ error }}
-      </div>
+      <div v-if="loadingLots" class="text-center">Loading parking lots...</div>
+      <div v-else-if="errorLots" class="alert alert-danger">{{ errorLots }}</div>
 
       <div v-else-if="parkingLots.length > 0" class="row">
-        <div
-          v-for="lot in parkingLots"
-          :key="lot.id"
-          class="col-md-6 col-lg-4 mb-4"
-        >
+        <div v-for="lot in parkingLots" :key="lot.id" class="col-md-6 col-lg-4 mb-4">
           <div class="card h-100 shadow-sm hover-card">
             <div class="card-body">
               <h5 class="card-title">{{ lot.prime_location_name }}</h5>
@@ -72,19 +62,16 @@
                   :key="spot.id"
                   class="spot-box"
                   :class="spot.status === 'O' ? 'occupied' : 'available'"
-                  :title="spot.status === 'O' ? getSpotDetails(spot) : 'Available'"
+                  :title="spot.status === 'O' ? 'Reserved' : 'Available'"
+                  @click="spot.status === 'O' ? openReservedSpot(spot) : null"
                 >
                   {{ spot.id }}
                 </div>
               </div>
             </div>
             <div class="card-footer d-flex justify-content-between">
-              <button class="btn btn-primary btn-sm" @click="editLot(lot.id)">
-                Edit
-              </button>
-              <button class="btn btn-danger btn-sm" @click="deleteLot(lot.id)">
-                Delete
-              </button>
+              <button class="btn btn-primary btn-sm" @click="editLot(lot.id)">Edit</button>
+              <button class="btn btn-danger btn-sm" @click="deleteLot(lot.id)">Delete</button>
             </div>
           </div>
         </div>
@@ -98,9 +85,7 @@
     <!-- Users Tab -->
     <div v-if="activeTab === 'users'">
       <h4>Registered Users</h4>
-      <div v-if="users.length === 0" class="alert alert-info">
-        No users found.
-      </div>
+      <div v-if="users.length === 0" class="alert alert-info">No users found.</div>
       <div v-else class="table-responsive">
         <table class="table table-striped">
           <thead>
@@ -131,21 +116,51 @@
       </div>
     </div>
 
-    <!-- Router outlet for summary page -->
-    <router-view v-if="$route.path === '/admin/summary'"></router-view>
+    <!-- Summary Tab -->
+    <div v-if="activeTab === 'summary'">
+      <AdminSummary />
+    </div>
+
+    <!-- Reserved Spot Modal -->
+    <div v-if="showSpotDetails" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">🚗 Reserved Parking Spot Details</h5>
+          <button class="btn-close" @click="closeSpotDetails"></button>
+        </div>
+        <div class="modal-body">
+          <table class="table table-bordered table-sm">
+            <tbody>
+              <tr><th>Spot ID</th><td>{{ selectedSpot.id }}</td></tr>
+              <tr><th>Customer ID</th><td>{{ selectedSpot.user_id }}</td></tr>
+              <tr><th>Vehicle Number</th><td>{{ selectedSpot.car_number }}</td></tr>
+              <tr><th>Parking Time</th><td>{{ formatDate(selectedSpot.reservation?.parking_timestamp) }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="closeSpotDetails">Close</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
+import AdminSummary from "./charts/AdminSummary.vue";
+
 export default {
   name: "AdminDashboard",
+  components: { AdminSummary },
   data() {
     return {
       parkingLots: [],
       users: [],
-      loading: true,
-      error: null,
+      loadingLots: true,
+      errorLots: null,
       activeTab: "lots",
+      showSpotDetails: false,
+      selectedSpot: null,
     };
   },
   computed: {
@@ -163,9 +178,9 @@ export default {
         const data = await res.json();
         this.parkingLots = data.parking_lots || [];
       } catch (err) {
-        this.error = "Failed to fetch parking lots.";
+        this.errorLots = "Failed to fetch parking lots.";
       } finally {
-        this.loading = false;
+        this.loadingLots = false;
       }
     },
     async fetchUsers() {
@@ -197,11 +212,19 @@ export default {
         console.error("Delete error:", err);
       }
     },
-    getSpotDetails(spot) {
-      return `Occupied by User ID: ${spot.user_id || "?"}`;
-    },
     getTotalCost(history = []) {
       return history.reduce((sum, r) => sum + (r.cost || 0), 0);
+    },
+    openReservedSpot(spot) {
+      this.selectedSpot = spot;
+      this.showSpotDetails = true;
+    },
+    closeSpotDetails() {
+      this.showSpotDetails = false;
+      this.selectedSpot = null;
+    },
+    formatDate(date) {
+      return date ? new Date(date).toLocaleString() : "N/A";
     },
   },
   mounted() {
@@ -212,37 +235,21 @@ export default {
 </script>
 
 <style scoped>
-.hover-card {
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-.hover-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-}
-.card-footer {
-  background-color: #f8f9fa;
-}
-.spots-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
-}
-.spot-box {
-  width: 35px;
-  height: 35px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: bold;
-  color: #fff;
-}
-.available {
-  background-color: green;
-}
-.occupied {
-  background-color: red;
-}
+.hover-card { transition: transform 0.2s, box-shadow 0.2s; }
+.hover-card:hover { transform: translateY(-5px); box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
+.card-footer { background-color: #f8f9fa; }
+.spots-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.spot-box { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; color: #fff; transition: transform 0.2s; }
+.spot-box:hover { transform: scale(1.1); }
+.available { background-color: #28a745; }
+.occupied { background-color: #dc3545; }
+
+/* Modal */
+.modal-overlay { position: fixed; top:0; left:0; right:0; bottom:0; background-color: rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1050; }
+.modal-content { background:#fff; border-radius:10px; width:420px; max-width:95%; box-shadow:0 5px 25px rgba(0,0,0,0.3); overflow:hidden; }
+.modal-header { background:#007bff; color:#fff; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; }
+.modal-body { padding:16px; }
+.modal-body table { width:100%; }
+.modal-footer { background:#f8f9fa; padding:10px 16px; text-align:right; }
+.btn-close { background:none; border:none; font-size:20px; color:#fff; cursor:pointer; }
 </style>

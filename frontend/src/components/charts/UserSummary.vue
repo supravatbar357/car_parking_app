@@ -1,35 +1,30 @@
 <template>
   <div>
     <h4 class="mb-3">📊 Your Parking Summary</h4>
-
     <div v-if="loading" class="text-center">Loading summary...</div>
     <div v-else>
-      <div class="row">
-        <div class="col-md-6 mb-4">
-          <div class="card p-3 text-center shadow-sm">
-            <h5>Total Bookings</h5>
-            <p class="display-6 text-primary">{{ summary.total_bookings }}</p>
-          </div>
-        </div>
-        <div class="col-md-6 mb-4">
-          <div class="card p-3 text-center shadow-sm">
-            <h5>Total Cost</h5>
-            <p class="display-6 text-success">₹{{ summary.total_cost }}</p>
+      <!-- KPI Cards -->
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3" v-for="(value, key) in kpis" :key="key">
+          <div class="kpi-card text-center shadow-sm p-3">
+            <h5>{{ key }}</h5>
+            <p class="display-6">{{ value }}</p>
           </div>
         </div>
       </div>
 
-      <div class="row">
-        <div class="col-md-6 mb-4">
+      <!-- Charts -->
+      <div class="row g-4">
+        <div class="col-md-6">
           <div class="card p-3 shadow-sm">
             <h5>Active vs Past Bookings</h5>
-            <doughnut-chart :chart-data="bookingChartData" />
+            <canvas ref="bookingChart"></canvas>
           </div>
         </div>
-        <div class="col-md-6 mb-4">
+        <div class="col-md-6">
           <div class="card p-3 shadow-sm">
-            <h5>Booking Cost Over Time</h5>
-            <bar-chart :chart-data="costChartData" />
+            <h5>Monthly Spending</h5>
+            <canvas ref="costChart"></canvas>
           </div>
         </div>
       </div>
@@ -38,78 +33,72 @@
 </template>
 
 <script>
-import { Doughnut, Bar } from "vue-chartjs";
-import {
-  Chart as ChartJS,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-} from "chart.js";
-
-ChartJS.register(Title, Tooltip, Legend, ArcElement, CategoryScale, LinearScale, BarElement);
-
 export default {
   name: "UserSummary",
-  components: {
-    doughnutChart: {
-      extends: Doughnut,
-      props: ["chartData"],
-      mounted() {
-        this.renderChart(this.chartData, { responsive: true, maintainAspectRatio: false });
-      },
-    },
-    barChart: {
-      extends: Bar,
-      props: ["chartData"],
-      mounted() {
-        this.renderChart(this.chartData, { responsive: true, maintainAspectRatio: false });
-      },
-    },
-  },
   data() {
     return {
-      summary: { total_bookings: 0, total_cost: 0 },
-      bookingChartData: null,
-      costChartData: null,
+      summary: null,
+      kpis: {},
       loading: true,
     };
   },
+  async mounted() {
+    await this.fetchSummary();
+    if (this.summary) {
+      this.setKPIs();
+      this.renderCharts();
+    }
+    this.loading = false;
+  },
   methods: {
     async fetchSummary() {
-      this.loading = true;
-      const token = localStorage.getItem("token");
       try {
-        const res = await fetch("/api/user/summary", { headers: { Authorization: `Bearer ${token}` } });
-        const data = await res.json();
-
-        this.summary = {
-          total_bookings: (data.active_reservations_count || 0) + (data.past_reservations_count || 0),
-          total_cost: data.total_spent || 0,
-        };
-
-        this.bookingChartData = {
-          labels: ["Active", "Past"],
-          datasets: [{ label: "Bookings", backgroundColor: ["#0d6efd", "#198754"], data: [data.active_reservations_count || 0, data.past_reservations_count || 0] }],
-        };
-
-        // For cost over time, you can generate dummy sequential data if not provided
-        this.costChartData = {
-          labels: data.history?.map(r => `#${r.id}`) || ["Jan", "Feb", "Mar"],
-          datasets: [{ label: "Cost", backgroundColor: "#ffc107", data: data.history?.map(r => r.cost) || [0, 0, 0] }],
-        };
+        const token = localStorage.getItem("token");
+        const res = await fetch("/api/user/summary", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error("Failed to fetch user summary");
+        this.summary = await res.json();
       } catch (err) {
-        console.error("Error fetching user summary:", err);
-      } finally {
-        this.loading = false;
+        console.error(err);
       }
     },
-  },
-  mounted() {
-    this.fetchSummary();
+    setKPIs() {
+      this.kpis = {
+        "Total Bookings": this.summary.total_bookings,
+        "Total Cost (₹)": this.summary.total_cost,
+        "Active": this.summary.active,
+        "Past": this.summary.past,
+      };
+    },
+    renderCharts() {
+      const Chart = this.$Chart;
+
+      // Active vs Past Bookings Donut
+      new Chart(this.$refs.bookingChart, {
+        type: "doughnut",
+        data: { labels: ["Active", "Past"], datasets: [{ data: [this.summary.active, this.summary.past], backgroundColor: ["#0d6efd", "#198754"] }] },
+        options: { responsive: true },
+      });
+
+      // Monthly Spending Bar
+      const labels = Object.keys(this.summary.monthly_cost || {});
+      const data = Object.values(this.summary.monthly_cost || {});
+      new Chart(this.$refs.costChart, {
+        type: "bar",
+        data: { labels, datasets: [{ label: "Cost (₹)", data, backgroundColor: "#ffc107" }] },
+        options: { responsive: true },
+      });
+    },
   },
 };
 </script>
+
+<style scoped>
+.kpi-card {
+  border-radius: 10px;
+  background: linear-gradient(135deg, #007bff, #6610f2);
+  color: #fff;
+  padding: 15px 10px;
+}
+</style>

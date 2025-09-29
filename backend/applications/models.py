@@ -4,6 +4,7 @@ from werkzeug.security import generate_password_hash
 
 db = SQLAlchemy()
 
+
 class Users(db.Model):
     __tablename__ = "users"
     
@@ -37,11 +38,16 @@ class ParkingLot(db.Model):
     pin_code = db.Column(db.String(10), nullable=False)
     number_of_spots = db.Column(db.Integer, nullable=False)
 
-    spots = db.relationship("ParkingSpot", backref="lot", lazy=True, cascade="all, delete-orphan")
+    spots = db.relationship(
+        "ParkingSpot",
+        backref="lot",
+        lazy=True,
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<ParkingLot {self.prime_location_name} ({self.number_of_spots} spots)>"
-    
+
     def convert_to_json(self, include_spots=False):
         data = {
             "id": self.id,
@@ -67,7 +73,7 @@ class ParkingSpot(db.Model):
 
     def __repr__(self):
         return f"<ParkingSpot {self.id} - Lot {self.lot_id} - Status {self.status}>"
-    
+
     def convert_to_json(self):
         return {
             "id": self.id,
@@ -80,7 +86,12 @@ class Reservation(db.Model):
     __tablename__ = "reservations"
 
     id = db.Column(db.Integer, primary_key=True)
-    spot_id = db.Column(db.Integer, db.ForeignKey("parking_spots.id"), nullable=False)
+    # Changed: allow NULL and set NULL if spot is deleted
+    spot_id = db.Column(
+        db.Integer,
+        db.ForeignKey("parking_spots.id", ondelete="SET NULL"),
+        nullable=True
+    )
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     vehicle_number = db.Column(db.String(20), nullable=False)
     parking_timestamp = db.Column(db.DateTime, default=datetime.utcnow)
@@ -89,11 +100,11 @@ class Reservation(db.Model):
 
     def __repr__(self):
         return f"<Reservation User {self.user_id} - Spot {self.spot_id} - Vehicle {self.vehicle_number}>"
-    
+
     def convert_to_json(self):
         return {
             "id": self.id,
-            "spot_id": self.spot_id,
+            "spot_id": self.spot_id,  # may be None if lot/spot deleted
             "user_id": self.user_id,
             "vehicle_number": self.vehicle_number,
             "parking_timestamp": self.parking_timestamp.isoformat(),
@@ -102,7 +113,7 @@ class Reservation(db.Model):
         }
 
 
-def create_default_admin():
+def create_default_admin(): 
     from sqlalchemy.exc import IntegrityError
 
     admin_email = "admin@gmail.com"

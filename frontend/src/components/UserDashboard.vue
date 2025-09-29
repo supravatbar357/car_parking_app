@@ -31,11 +31,18 @@
         </button>
       </li>
       <li class="nav-item">
-        <button class="nav-link" @click="goToSummary">
+        <router-link
+          class="nav-link"
+          :class="{ active: $route.path === '/user/summary' }"
+          to="/user/summary"
+        >
           Summary
-        </button>
+        </router-link>
       </li>
     </ul>
+
+    <!-- Routed content -->
+    <router-view v-if="$route.path === '/user/summary'"></router-view>
 
     <!-- Parking Lots -->
     <div v-if="activeTab === 'lots'" class="row g-3 mt-3">
@@ -142,9 +149,6 @@ export default {
     },
     releaseReservation(id) {
       this.$router.push({ name: "ReleaseForm", params: { id } });
-    },
-    goToSummary() {
-      this.$router.push({ name: "UserSummary" });
     },
   },
   mounted() {

@@ -1,11 +1,14 @@
-from flask import current_app as app, request
-from applications.models import db, Users, ParkingLot, ParkingSpot, Reservation
+from flask import current_app as app, request, jsonify
 from flask_restful import Resource, abort
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from flask_restful import Resource
-from flask import request, jsonify
+from applications.models import db, Users, ParkingLot, ParkingSpot, Reservation
 from applications.tasks import export_parking_data
 from .api import cache
+from applications.worker import celery
+import os
+
+EXPORTS_DIR = os.path.join(os.getcwd(), "exports")
+os.makedirs(EXPORTS_DIR, exist_ok=True)  # ensure folder exists
 
 
 class ParkingLotsAPI(Resource):
@@ -22,11 +25,9 @@ class ParkingLotsAPI(Resource):
             """Helper to attach reservation details if spot is occupied."""
             spot_info = spot.convert_to_json()
             if spot.status == "O" and spot.reservations:
-                # Pick the latest reservation by timestamp
                 latest_reservation = sorted(
                     spot.reservations, key=lambda r: r.parking_timestamp
                 )[-1]
-
                 spot_info["reservation"] = latest_reservation.convert_to_json()
                 spot_info["user_id"] = latest_reservation.user_id
                 spot_info["car_number"] = getattr(latest_reservation, "vehicle_number", None)
@@ -129,15 +130,12 @@ class ParkingLotsAPI(Resource):
             lot.number_of_spots = data["number_of_spots"]
 
         db.session.commit()
-
-        # Clear cache after update
         cache.delete_memoized(ParkingLotsAPI.get)
-
         return lot.convert_to_json(include_spots=True), 200
 
     @jwt_required()
     def delete(self, lot_id):
-        """Admin: Delete a parking lot only if all spots are available."""
+        """Admin: Delete a parking lot only if all spots are free and no active reservations exist."""
         user_id = get_jwt_identity()
         user = Users.query.get(user_id)
         if not user or not user.is_admin:
@@ -147,43 +145,37 @@ class ParkingLotsAPI(Resource):
         if not lot:
             abort(404, message="Parking lot not found")
 
-        # Check if any spot is occupied
+        # 1. Check if any spot is occupied
         occupied_spots = ParkingSpot.query.filter_by(lot_id=lot.id, status="O").count()
         if occupied_spots > 0:
             abort(400, message="Cannot delete lot: some spots are still occupied")
 
+        # 2. Check if any ACTIVE reservations exist in this lot
+        active_reservations = Reservation.query.join(ParkingSpot).filter(
+            ParkingSpot.lot_id == lot.id,
+            Reservation.leaving_timestamp == None
+        ).count()
+        if active_reservations > 0:
+            abort(400, message="Cannot delete lot: active reservations exist")
+
+        # 3. Safe to delete
         db.session.delete(lot)
         db.session.commit()
 
-        # Clear cache after deletion
+        # 4. Clear cache
         cache.delete_memoized(ParkingLotsAPI.get)
 
         return {"message": "Parking lot deleted successfully"}, 200
 
 
-from flask import request, jsonify, url_for
-from flask_restful import Resource
-from flask_jwt_extended import jwt_required
-from applications.models import ParkingLot, ParkingSpot
-from applications.tasks import export_parking_data
-from applications.worker import celery
-import os
-
-EXPORTS_DIR = os.path.join(os.getcwd(), "exports")
-os.makedirs(EXPORTS_DIR, exist_ok=True)  # ensure folder exists
-
 class ExportParkingDataAPI(Resource):
     @jwt_required()
     def post(self):
-        """
-        Trigger CSV export of parking data for all lots and spots.
-        Returns task_id to track progress.
-        """
+        """Trigger CSV export of parking data for all lots and spots."""
         email = request.json.get("email")
         if not email:
             return {"message": "Email is required"}, 400
 
-        # Collect parking info
         parking_info = []
         lots = ParkingLot.query.all()
         for lot in lots:
@@ -197,7 +189,6 @@ class ExportParkingDataAPI(Resource):
 
         # Trigger async Celery task
         task = export_parking_data.delay(parking_info, email)
-
         return {
             "message": "Export task started. Use task_id to check status.",
             "task_id": task.id
@@ -206,9 +197,7 @@ class ExportParkingDataAPI(Resource):
 
 class ExportStatusAPI(Resource):
     def get(self, task_id):
-        """
-        Check status of a Celery task
-        """
+        """Check status of a Celery task."""
         res = celery.AsyncResult(task_id)
         info = None
         try:
