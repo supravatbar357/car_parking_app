@@ -1,51 +1,39 @@
 <template>
   <div class="container mt-5">
-    <h2 class="text-center mb-4 text-primary fw-bold">📊 Admin Summary Dashboard</h2>
+    <h2 class="text-center mb-4 fw-bold text-primary">
+      🧠 Admin Summary Dashboard
+    </h2>
 
-    <!-- Highlighted KPIs -->
-    <div class="row g-3 mb-4 justify-content-center">
+    <!-- Loading Spinner -->
+    <div v-if="loading" class="text-center my-5">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+
+    <!-- KPIs Section -->
+    <div v-else class="row g-3 justify-content-center mb-4">
       <div
-        class="col-6 col-sm-4 col-md-3 col-lg-2"
         v-for="(value, key) in kpis"
         :key="key"
+        class="col-6 col-sm-4 col-md-3 col-lg-2"
       >
         <div class="kpi-card shadow-lg text-center p-3">
-          <div class="kpi-icon mb-2">
-            <i :class="getKPIIcon(key)"></i>
-          </div>
+          <i :class="getKPIIcon(key)" class="kpi-icon mb-2"></i>
           <small class="text-white">{{ key }}</small>
           <h4 class="fw-bold text-white mt-1">{{ value }}</h4>
         </div>
       </div>
     </div>
 
-    <!-- Charts -->
+    <!-- Charts Section -->
     <div class="row g-4">
-      <div class="col-md-6">
-        <div class="card shadow-lg p-3">
-          <h5 class="text-center text-success">Reservations Overview</h5>
-          <canvas ref="reservationChart"></canvas>
-        </div>
-      </div>
-
-      <div class="col-md-6">
-        <div class="card shadow-lg p-3">
-          <h5 class="text-center text-info">Revenue Trends Over Weeks</h5>
-          <canvas ref="revenueLineChart"></canvas>
-        </div>
-      </div>
-
-      <div class="col-md-6">
-        <div class="card shadow-lg p-3">
-          <h5 class="text-center text-warning">Parking Utilization</h5>
-          <canvas ref="utilizationChart"></canvas>
-        </div>
-      </div>
-
-      <div class="col-md-6">
-        <div class="card shadow-lg p-3">
-          <h5 class="text-center text-danger">Lots vs Spots</h5>
-          <canvas ref="lotsSpotsChart"></canvas>
+      <div class="col-md-6" v-for="(chart, key) in chartRefs" :key="key">
+        <div class="card shadow-sm border-0 chart-card">
+          <div class="card-body">
+            <h5 class="text-center fw-semibold text-primary mb-3">{{ chart.title }}</h5>
+            <canvas :ref="key" height="250"></canvas>
+          </div>
         </div>
       </div>
     </div>
@@ -53,92 +41,160 @@
 </template>
 
 <script>
+import { nextTick } from "vue";
+
 export default {
   name: "AdminSummary",
   data() {
     return {
       summary: null,
       kpis: {},
+      loading: true,
+      chartInstances: {},
+      chartRefs: {
+        reservationChart: { title: "Reservations Overview" },
+        revenueLineChart: { title: "Weekly Revenue Trend" },
+        utilizationChart: { title: "Parking Utilization" },
+        lotsSpotsChart: { title: "Lots vs Spots" },
+      },
     };
   },
   async mounted() {
     await this.fetchSummary();
     if (this.summary) {
       this.setKPIs();
+      await nextTick();
       this.renderCharts();
     }
+    this.loading = false;
   },
   methods: {
     async fetchSummary() {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch("/api/admin/summary", {
+        const res = await fetch("http://127.0.0.1:8000/api/admin/summary", {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error("Failed to fetch admin summary");
         this.summary = await res.json();
       } catch (err) {
-        console.error(err);
+        console.error("❌ Fetch error:", err);
       }
     },
+
     setKPIs() {
       this.kpis = {
-        "Total Lots": this.summary.total_lots,
-        "Total Spots": this.summary.total_spots,
-        "Occupied Spots": this.summary.occupied_spots,
-        "Free Spots": this.summary.free_spots,
-        "Total Reservations": this.summary.total_reservations,
-        "Total Revenue (₹)": this.summary.total_revenue.toFixed(2),
+        "Total Lots": this.summary.total_lots ?? 0,
+        "Total Spots": this.summary.total_spots ?? 0,
+        "Occupied Spots": this.summary.occupied_spots ?? 0,
+        "Free Spots": this.summary.free_spots ?? 0,
+        "Total Reservations": this.summary.total_reservations ?? 0,
+        "Total Revenue (₹)": this.summary.total_revenue?.toFixed(2) ?? "0.00",
       };
     },
+
     getKPIIcon(key) {
       const icons = {
         "Total Lots": "fas fa-building fa-2x",
         "Total Spots": "fas fa-parking fa-2x",
         "Occupied Spots": "fas fa-car fa-2x",
         "Free Spots": "fas fa-car-side fa-2x",
-        "Total Reservations": "fas fa-receipt fa-2x",
-        "Total Revenue (₹)": "fas fa-dollar-sign fa-2x",
+        "Total Reservations": "fas fa-ticket-alt fa-2x",
+        "Total Revenue (₹)": "fas fa-wallet fa-2x",
       };
       return icons[key] || "fas fa-chart-bar fa-2x";
     },
-    renderCharts() {
-      const Chart = this.$Chart; // use global Chart.js
 
-      // Reservations Stacked Bar
-      new Chart(this.$refs.reservationChart, {
+    renderCharts() {
+      const Chart = this.$Chart;
+      if (!Chart) {
+        console.error("❌ Chart.js not found in global properties.");
+        return;
+      }
+
+      // Clear old charts
+      Object.values(this.chartInstances).forEach((chart) => chart.destroy());
+
+      const anim = { duration: 1200, easing: "easeOutQuart" };
+
+      // 1️⃣ Reservations Overview (Stacked Bar)
+      this.chartInstances.reservationChart = new Chart(this.$refs.reservationChart, {
         type: "bar",
         data: {
           labels: ["Reservations"],
           datasets: [
-            { label: "Reserved", data: [this.summary.occupied_spots], backgroundColor: "#dc3545" },
-            { label: "Unreserved", data: [this.summary.free_spots], backgroundColor: "#28a745" },
+            { label: "Occupied", data: [this.summary.occupied_spots], backgroundColor: "#dc3545" },
+            { label: "Free", data: [this.summary.free_spots], backgroundColor: "#28a745" },
           ],
         },
-        options: { responsive: true, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: "bottom" } },
+          scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+          animation: anim,
+        },
       });
 
-      // Revenue Trend Line
-      const weeks = Object.keys(this.summary.weekly_revenue || {}).sort();
-      const revenueData = weeks.map((w) => this.summary.weekly_revenue[w]);
-      new Chart(this.$refs.revenueLineChart, {
+      // 2️⃣ Weekly Revenue Trend (Line)
+      const weeks = Object.keys(this.summary.weekly_revenue || {});
+      const revenue = weeks.map((w) => this.summary.weekly_revenue[w]);
+      this.chartInstances.revenueLineChart = new Chart(this.$refs.revenueLineChart, {
         type: "line",
-        data: { labels: weeks, datasets: [{ label: "Revenue (₹)", data: revenueData, borderColor: "#007bff", fill: false }] },
-        options: { responsive: true },
+        data: {
+          labels: weeks.length ? weeks : ["No Data"],
+          datasets: [
+            {
+              label: "Revenue (₹)",
+              data: revenue.length ? revenue : [0],
+              borderColor: "#007bff",
+              backgroundColor: "rgba(0, 123, 255, 0.2)",
+              fill: true,
+              tension: 0.3,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } },
+          animation: anim,
+        },
       });
 
-      // Parking Utilization Donut
-      new Chart(this.$refs.utilizationChart, {
+      // 3️⃣ Utilization (Doughnut)
+      this.chartInstances.utilizationChart = new Chart(this.$refs.utilizationChart, {
         type: "doughnut",
-        data: { labels: ["Occupied", "Free"], datasets: [{ data: [this.summary.occupied_spots, this.summary.free_spots], backgroundColor: ["#fd7e14", "#6c757d"] }] },
-        options: { responsive: true },
+        data: {
+          labels: ["Occupied", "Free"],
+          datasets: [
+            {
+              data: [this.summary.occupied_spots, this.summary.free_spots],
+              backgroundColor: ["#fd7e14", "#6c757d"],
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: "bottom" } },
+          animation: anim,
+        },
       });
 
-      // Lots vs Spots Bar
-      new Chart(this.$refs.lotsSpotsChart, {
+      // 4️⃣ Lots vs Spots (Bar)
+      this.chartInstances.lotsSpotsChart = new Chart(this.$refs.lotsSpotsChart, {
         type: "bar",
-        data: { labels: ["Lots", "Spots"], datasets: [{ data: [this.summary.total_lots, this.summary.total_spots], backgroundColor: ["#dc3545", "#6f42c1"] }] },
-        options: { responsive: true },
+        data: {
+          labels: ["Lots", "Spots"],
+          datasets: [
+            { data: [this.summary.total_lots, this.summary.total_spots], backgroundColor: ["#6610f2", "#20c997"] },
+          ],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } },
+          animation: anim,
+        },
       });
     },
   },
@@ -147,16 +203,24 @@ export default {
 
 <style scoped>
 .kpi-card {
-  border-radius: 10px;
-  padding: 15px 10px;
+  border-radius: 12px;
   background: linear-gradient(135deg, #007bff, #6610f2);
   color: #fff;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: all 0.3s ease;
 }
 .kpi-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
 }
-.kpi-icon i { font-size: 28px; }
-.card { min-height: 300px; }
+.kpi-icon {
+  font-size: 28px;
+}
+.chart-card {
+  border-radius: 16px;
+  transition: all 0.3s ease;
+  min-height: 320px;
+}
+.chart-card:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
 </style>
