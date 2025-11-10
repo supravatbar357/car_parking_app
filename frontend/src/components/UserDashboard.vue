@@ -2,17 +2,6 @@
   <div class="container mt-5">
     <h2 class="text-center mb-4 text-primary fw-bold">🚗 Smart Parking Dashboard</h2>
 
-    <!-- Search bar -->
-    <div class="mb-4 d-flex justify-content-center flex-wrap">
-      <input
-        v-model="searchQuery"
-        type="text"
-        class="form-control w-50 me-2 mb-2"
-        placeholder="Search by PIN code or location"
-      />
-      <button class="btn btn-primary mb-2" @click="searchLots">Search</button>
-    </div>
-
     <!-- Tabs -->
     <ul class="nav nav-tabs mt-4">
       <li class="nav-item">
@@ -39,10 +28,12 @@
           Summary
         </router-link>
       </li>
+      <li class="nav-item">
+        <button class="nav-link" :class="{ active: activeTab === 'export' }" @click="activeTab = 'export'">
+          Export CSV
+        </button>
+      </li>
     </ul>
-
-    <!-- Routed content -->
-    <router-view v-if="$route.path === '/user/summary'"></router-view>
 
     <!-- Parking Lots -->
     <div v-if="activeTab === 'lots'" class="row g-3 mt-3">
@@ -105,6 +96,17 @@
         </div>
       </div>
     </div>
+
+    <!-- Export CSV -->
+    <div v-if="activeTab === 'export'" class="mt-4">
+      <h4>Export Parking Data as CSV</h4>
+      <div class="d-flex flex-wrap align-items-center mb-3">
+        <button class="btn btn-warning me-3 mb-2" :disabled="exportingCSV" @click="exportCSV">
+          {{ exportingCSV ? 'Exporting CSV...' : 'Export CSV' }}
+        </button>
+        <span v-if="taskId" class="text-info mb-2">Task in progress... Task ID: {{ taskId }}</span>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -115,8 +117,10 @@ export default {
     return {
       parkingLots: [],
       reservations: [],
-      searchQuery: "",
       activeTab: "lots",
+      exportingCSV: false,
+      taskId: null,
+      exportInterval: null,
     };
   },
   computed: {
@@ -134,13 +138,6 @@ export default {
       const data = await res.json();
       this.parkingLots = data.parking_lots || [];
     },
-    async searchLots() {
-      const token = localStorage.getItem("token");
-      const url = this.searchQuery ? `/api/parking_lots?query=${this.searchQuery}` : `/api/parking_lots`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
-      this.parkingLots = data.parking_lots || [];
-    },
     async fetchReservations() {
       const token = localStorage.getItem("token");
       const res = await fetch("/api/reservations", { headers: { Authorization: `Bearer ${token}` } });
@@ -150,10 +147,49 @@ export default {
     releaseReservation(id) {
       this.$router.push({ name: "ReleaseForm", params: { id } });
     },
+
+    // CSV Export
+    async exportCSV() {
+      try {
+        this.exportingCSV = true;
+        const token = localStorage.getItem("token");
+        const userEmail = localStorage.getItem("user_email"); 
+        const res = await fetch("/api/export", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ email: userEmail }),
+        });
+        const data = await res.json();
+        this.taskId = data.task_id;
+
+        this.exportInterval = setInterval(async () => {
+          const statusRes = await fetch(`/api/export/status/${this.taskId}`);
+          const status = await statusRes.json();
+          if (status.state === "SUCCESS") {
+            clearInterval(this.exportInterval);
+            this.exportingCSV = false;
+            this.taskId = null;
+            alert("CSV export complete! Check your email.");
+          } else if (status.state === "FAILURE") {
+            clearInterval(this.exportInterval);
+            this.exportingCSV = false;
+            this.taskId = null;
+            alert("CSV export failed.");
+          }
+        }, 3000);
+      } catch (err) {
+        console.error(err);
+        this.exportingCSV = false;
+        this.taskId = null;
+      }
+    },
   },
   mounted() {
     this.fetchParkingLots();
     this.fetchReservations();
+  },
+  beforeDestroy() {
+    if (this.exportInterval) clearInterval(this.exportInterval);
   },
 };
 </script>

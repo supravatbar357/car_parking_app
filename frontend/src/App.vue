@@ -4,7 +4,7 @@
     <nav class="navbar navbar-expand-lg custom-navbar shadow-sm">
       <div class="container-fluid">
         <router-link class="navbar-brand fw-bold text-light" to="/">
-          🚗 Parking App
+           Parking App
         </router-link>
 
         <button

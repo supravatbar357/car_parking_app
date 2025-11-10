@@ -1,15 +1,8 @@
-from flask import current_app as app, request, jsonify
+from flask import request
 from flask_restful import Resource, abort
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from applications.models import db, Users, ParkingLot, ParkingSpot, Reservation
-from applications.tasks import export_parking_data
 from .api import cache
-from applications.worker import celery
-import os
-
-EXPORTS_DIR = os.path.join(os.getcwd(), "exports")
-os.makedirs(EXPORTS_DIR, exist_ok=True)  # ensure folder exists
-
 
 class ParkingLotsAPI(Resource):
     @jwt_required()
@@ -22,7 +15,6 @@ class ParkingLotsAPI(Resource):
             abort(403, message="User not found")
 
         def build_spot_data(spot):
-            """Helper to attach reservation details if spot is occupied."""
             spot_info = spot.convert_to_json()
             if spot.status == "O" and spot.reservations:
                 latest_reservation = sorted(
@@ -37,7 +29,6 @@ class ParkingLotsAPI(Resource):
             lot = ParkingLot.query.get(lot_id)
             if not lot:
                 abort(404, message="Parking lot not found")
-
             spots_data = [build_spot_data(spot) for spot in lot.spots]
             return {**lot.convert_to_json(include_spots=False), "spots": spots_data}, 200
 
@@ -85,9 +76,7 @@ class ParkingLotsAPI(Resource):
             db.session.add(spot)
         db.session.commit()
 
-        # Clear cached GET data
         cache.delete_memoized(ParkingLotsAPI.get)
-
         return new_lot.convert_to_json(include_spots=True), 201
 
     @jwt_required()
@@ -145,12 +134,10 @@ class ParkingLotsAPI(Resource):
         if not lot:
             abort(404, message="Parking lot not found")
 
-        # 1. Check if any spot is occupied
         occupied_spots = ParkingSpot.query.filter_by(lot_id=lot.id, status="O").count()
         if occupied_spots > 0:
             abort(400, message="Cannot delete lot: some spots are still occupied")
 
-        # 2. Check if any ACTIVE reservations exist in this lot
         active_reservations = Reservation.query.join(ParkingSpot).filter(
             ParkingSpot.lot_id == lot.id,
             Reservation.leaving_timestamp == None
@@ -158,51 +145,8 @@ class ParkingLotsAPI(Resource):
         if active_reservations > 0:
             abort(400, message="Cannot delete lot: active reservations exist")
 
-        # 3. Safe to delete
         db.session.delete(lot)
         db.session.commit()
-
-        # 4. Clear cache
         cache.delete_memoized(ParkingLotsAPI.get)
 
         return {"message": "Parking lot deleted successfully"}, 200
-
-
-class ExportParkingDataAPI(Resource):
-    @jwt_required()
-    def post(self):
-        """Trigger CSV export of parking data for all lots and spots."""
-        email = request.json.get("email")
-        if not email:
-            return {"message": "Email is required"}, 400
-
-        parking_info = []
-        lots = ParkingLot.query.all()
-        for lot in lots:
-            for spot in lot.spots:
-                parking_info.append({
-                    "lot_name": lot.prime_location_name,
-                    "spot_id": spot.id,
-                    "status": spot.status,
-                    "price_per_hour": float(lot.price)
-                })
-
-        # Trigger async Celery task
-        task = export_parking_data.delay(parking_info, email)
-        return {
-            "message": "Export task started. Use task_id to check status.",
-            "task_id": task.id
-        }, 202
-
-
-class ExportStatusAPI(Resource):
-    def get(self, task_id):
-        """Check status of a Celery task."""
-        res = celery.AsyncResult(task_id)
-        info = None
-        try:
-            info = res.result or res.info
-        except Exception:
-            info = res.info
-
-        return {"task_id": task_id, "state": res.state, "info": info}, 200
