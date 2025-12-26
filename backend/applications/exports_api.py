@@ -1,45 +1,48 @@
-from flask import request
+# applications/exports_api.py
 from flask_restful import Resource
-from flask_jwt_extended import jwt_required
-from applications.models import ParkingLot, ParkingSpot
-from applications.tasks import export_parking_data
+from flask import request
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from applications.tasks import export_parking_data  # ✅ updated import
+from celery.result import AsyncResult
 from applications.worker import celery
 
 
-class ExportParkingDataAPI(Resource):
+class ExportCSVAPI(Resource):
     @jwt_required()
     def post(self):
-        """Trigger CSV export of parking data for all lots and spots."""
-        email = request.json.get("email")
-        if not email:
-            return {"message": "Email is required"}, 400
+        """
+        Trigger an async export of the current user's parking reservations.
+        Body (optional): { "date_from": "...", "date_to": "...", "email": "..." }
+        Returns: { "task_id": "<celery id>" }
+        """
+        user_id = get_jwt_identity()
+        data = request.get_json(silent=True) or {}
+        filters = {}
 
-        parking_info = []
-        lots = ParkingLot.query.all()
-        for lot in lots:
-            for spot in lot.spots:
-                parking_info.append({
-                    "lot_name": lot.prime_location_name,
-                    "spot_id": spot.id,
-                    "status": spot.status,
-                    "price_per_hour": float(lot.price)
-                })
+        if data.get("date_from"):
+            filters["date_from"] = data["date_from"]
+        if data.get("date_to"):
+            filters["date_to"] = data["date_to"]
 
-        task = export_parking_data.delay(parking_info, email)
-        return {
-            "message": "Export task started. Use task_id to check status.",
-            "task_id": task.id
-        }, 202
+        # enqueue Celery task
+        async_result = export_parking_data.apply_async(args=(user_id, data.get("email"), filters))
+        return {"task_id": async_result.id}, 202
 
 
 class ExportStatusAPI(Resource):
     @jwt_required()
     def get(self, task_id):
-        """Check status of a Celery task."""
-        res = celery.AsyncResult(task_id)
-        info = None
-        try:
-            info = res.result or res.info
-        except Exception:
-            info = res.info
-        return {"task_id": task_id, "state": res.state, "info": info}, 200
+        """
+        Check status of a previously enqueued export task.
+        Returns status and result info if available.
+        """
+        res = AsyncResult(task_id, app=celery)
+        response = {"task_id": task_id, "state": res.state}
+
+        if res.ready():
+            try:
+                response["result"] = res.result
+            except Exception:
+                response["result"] = {"error": "unable_to_fetch_result"}
+
+        return response

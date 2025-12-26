@@ -1,3 +1,4 @@
+# applications/__init__.py
 from flask import Flask
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
@@ -12,7 +13,7 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # Enable CORS for frontend (localhost:5173)
+    # Enable CORS for frontend (you may restrict origin in production)
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
     db.init_app(app)
@@ -30,8 +31,11 @@ def create_app():
     register_routes(api)
     register_extra_routes(app)
 
-    # Import tasks *after* Celery and app setup to avoid circular imports
-    from applications import tasks
+    # import tasks module to ensure Celery discovers them
+    # try:
+    #     from applications import tasks as tasks_module
+    # except Exception:
+    #     app.logger.exception("Failed to import applications.tasks (Celery tasks module)")
 
     # Link Celery with Flask config
     celery.conf.update(app.config)
