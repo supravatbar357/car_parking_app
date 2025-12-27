@@ -70,7 +70,54 @@ The system follows a **RESTful architecture** with a secure backend and a respon
 - 🔄 RESTful API-based Architecture
 - 📱 Responsive UI Design
 
+Here’s a **clean, technical, and README-ready section** you can **append** to your existing `README.md` to document the **Payment functionality** clearly.
+
+You can paste this **after “Core Features” or before “Project Structure”**.
+
 ---
 
-## 🗂️ Project Structure
+## 💳 Payment & Billing Functionality
+
+The Vehicle Parking Management System includes a **Payment module** that allows users to view their pending parking dues and complete payments seamlessly using **UPI-based digital payments**.
+
+### 🔹 Payment Workflow (User Side)
+
+* Each user can access a dedicated **Payments tab** from the dashboard.
+* The system calculates the **due amount** based on:
+
+  * Reservation duration
+  * Parking slot pricing
+  * Active or completed reservations
+* The due amount is displayed in real time on the Payments screen.
+* Users can initiate payment via **UPI** using an integrated payment link or QR-based redirection.
+* Once the payment is completed:
+
+  * The transaction status is updated
+  * The due amount is cleared
+  * Payment records are stored for future reference
+
+### 🔹 Payment Features
+
+* 💰 Real-time due amount calculation
+* 📱 UPI-based payment redirection (PhonePe / Google Pay / Paytm supported)
+* 🔗 Secure payment link generation
+* 🧾 Payment status tracking
+* 📊 Payment history visibility (future scope)
+* 🔐 User-specific payment access (JWT protected)
+
+### 🔹 Security & Access Control
+
+* Payments are accessible **only to authenticated users**
+* JWT tokens ensure secure API communication
+* Users can only view and pay **their own dues**
+* Admin access is restricted to monitoring and auditing purposes
+
+### 🔹 Future Enhancements (Planned)
+
+* Online payment gateway integration (Razorpay / Stripe)
+* Automatic invoice generation
+* Payment failure handling & retries
+* Admin-level payment analytics
+* Refund handling for cancelled reservations
+
 
